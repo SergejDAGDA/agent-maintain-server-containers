@@ -64,3 +64,13 @@ Do not ask for permission for every pull, up, healthcheck, and safe rollback ins
 Separate user-supplied prior evidence from independently verified current facts. Record application version, runtime/container state, user state, deployment-source changes, network/access changes and schema changes separately. A backup workflow restarting 40 containers is a real runtime mutation even if no application version changed.
 
 Never describe a `plan` or schema validation as proof of backup, application compatibility or production safety.
+
+
+## Composite service identities
+
+A logical group component is not necessarily a Docker Compose service name.
+Resolve it through the service policy record's exact `identity.compose_services`
+or an explicitly declared `service_groups.<group>.component_aliases` mapping.
+Never derive aliases from punctuation changes or container naming patterns.
+Unresolved components in an atomic/update-as-group stack block mutation until
+the project owner explicitly supplies the correct mapping.
