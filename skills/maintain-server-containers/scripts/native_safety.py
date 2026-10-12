@@ -11,6 +11,11 @@ from typing import Any
 ACTION_CLASSES = {"AUTO_SAFE", "AUTO_GATED", "PIN_ONLY"}
 UNKNOWN = {"unknown", "unverified", "unresolved", "tbd", "todo", "not_checked", "none_recorded", ""}
 IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
+SECURITY_INVARIANTS = {
+    "read_only_root", "no_new_privileges", "cap_drop_all",
+    "read_only_docker_socket", "lan_only_binding",
+}
+USER_INVARIANT = re.compile(r"^user_[0-9]+_[0-9]+$")
 
 
 def _defined(value: Any) -> bool:
@@ -19,7 +24,7 @@ def _defined(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() not in UNKNOWN
     if isinstance(value, list):
-        return all(_defined(x) for x in value)
+        return bool(value) and all(_defined(x) for x in value)
     if isinstance(value, dict):
         return bool(value) and all(_defined(v) for v in value.values())
     return False
@@ -64,7 +69,10 @@ def safety_issues(service: dict) -> list[str]:
         for key in ("databases", "uploaded_user_files", "account_state",
                     "instance_identity", "disposable_caches", "secrets"):
             val = state.get(key)
-            if not _defined(val):
+            # Explicit empty collections are valid descriptions of *absent*
+            # state, but not evidence identities for recovery or rollback.
+            valid = (isinstance(val, list) and all(_defined(v) for v in val)) or _defined(val)
+            if not valid:
                 issues.append(f"state_contract.{key}: unresolved under complete state")
         dbs = state.get("databases")
         if not isinstance(dbs, list):
@@ -110,6 +118,12 @@ def safety_issues(service: dict) -> list[str]:
                       "must be an explicit list (empty allowed for ports/security)")
         if isinstance(val, list) and not all(isinstance(x, str) and x.strip() for x in val):
             issues.append(f"topology.{key}: invalid entry")
+        if key == "security_invariants" and isinstance(val, list):
+            for invariant in val:
+                if (not isinstance(invariant, str)
+                        or invariant not in SECURITY_INVARIANTS
+                        and USER_INVARIANT.fullmatch(invariant) is None):
+                    issues.append(f"topology.security_invariants: unsupported invariant {invariant!r}")
     require("topology", "container_identity", _defined, "container identity missing")
     require("health", "docker_expectation",
             lambda v: v in ("healthy", "no_healthcheck"), "must be healthy or no_healthcheck")
