@@ -12,6 +12,8 @@
   Checkpoint and targeted `project-documentation` update without new handoffs.
 - Enforce existing MANUAL, NO_TOUCH and external ownership restrictions.
 - Synthetic policy fixture and regression tests.
+- Fix fail-closed regressions: forbid empty collections as backup/rollback/smoke identity evidence, while allowing explicitly empty state inventories; reject unsupported security invariants before live checks; stop all portable-policy live inspection if validation fails.
+- Validate selective Docker metadata types, reject unapproved host/container networking and spoofed Docker socket sources; cover both with synthetic regression tests.
 - Enforce per-service extended-policy safety semantics (state, migration, rollback, backup, topology and health), and compare only selected read-only Docker metadata. Distinguish metadata parity from proof of a safe deployment.
 - Define a portable deployment record discovery/reconciliation contract and local project integration checklist.
 - This is an agent workflow, **not a bundled Docker mutation executor**.
