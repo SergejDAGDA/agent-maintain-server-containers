@@ -91,6 +91,39 @@ Update services eligible under the project policy, preserving user data and perf
 The last command is an *agent-level workflow request*, **not a command implemented by the bundled read-only Python CLI**. The agent must have the relevant authorized deployment and backup tools and must follow all gates in `SKILL.md`. It must not improvise a missing recovery mechanism.
 
 
+## Install a new third-party application from a repository
+
+The skill also defines `deploy-repository` for installing a new external application
+into an existing Compose server, starting with an explicit Git repository URL:
+
+```text
+$maintain-server-containers deploy-repository https://github.com/example-org/example-app
+Set it up as an isolated Docker Compose application on my server, check its
+dependencies, state and network exposure, and register it for future maintenance.
+```
+
+The agent inspects source/release metadata and upstream Dockerfiles/Compose as
+**untrusted input**, selects a reproducible version, checks conflicts with
+existing services, prepares deployment/configuration and protected persistent
+storage, performs the bounded initial deployment, verifies health and records
+the installed app in the server's existing maintenance policy.
+
+One explicit request covers normal reversible steps: the agent should not ask
+whether to create every folder or dependency. It must **not** silently grant
+privileged mode, host Docker socket access, broad writable mounts, expose
+administrative endpoints publicly, or overwrite existing user data. Missing
+third-party credentials or significant exposure/privilege changes require
+a focused decision. Generated secrets stay in protected storage, not Git or logs.
+
+A newly installed application defaults to `MANUAL` maintenance until an
+independent update-safety classification can be proven. Optional other
+Agent Skills never control whether core deployment can proceed.
+
+See [repository-deployment.md](skills/maintain-server-containers/references/repository-deployment.md)
+for the first-install protocol. This is an **agent-operated workflow**;
+the bundled read-only CLI is not yet a production installer.
+
+
 ## Deploy a project-owned application release
 
 The skill also defines a targeted agent workflow for a release built by your own
