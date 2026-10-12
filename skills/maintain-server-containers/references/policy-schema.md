@@ -93,3 +93,43 @@ makes structural validation **FAIL** rather than merely warning. A group
 containing a `MANUAL` or `NO_TOUCH` policy member remains blocked for
 automatic updates. Aliases do not grant new ownership or change the policies of
 the underlying service records.
+
+
+## Release-management strategy (optional)
+
+A project that builds its own application releases can declare a **release strategy**
+independent of the safety class. This is not an update executor or a required
+migration of existing policies:
+
+\`\`\`yaml
+name: local-editor
+policy_class: MANUAL
+ownership: application_project
+release_management:
+  strategy: project_managed
+  release_authority: application_project
+  version_monitoring: false
+  automatic_updates: false
+\`\`\`
+
+The same \`release_management\` fields are understood by portable and extended
+policies. Accepted strategies: \`upstream_managed\`, \`project_managed\`, and
+\`externally_managed\`. Accepted release authorities: \`application_project\`,
+\`deployment_project\`, and \`external_admin\`.
+
+A \`project_managed\` service requires \`MANUAL\` or \`NO_TOUCH\`, must set
+\`version_monitoring: false\` and \`automatic_updates: false\`, and is never
+included in \`update-auto\`. A targeted \`deploy-project\` may use a
+project-approved release of a \`MANUAL\` service only after its normal safety,
+ownership, backup and rollback gates pass. \`NO_TOUCH\` requires a separate
+expressly authorized workstream before any mutation. External administration
+cannot be silently overridden.
+
+This setting is optional. When absent, the agent must establish release
+authority from the project and runtime rather than assuming that public
+GitHub releases, private Git \`HEAD\`, or a Docker tag are authoritative.
+
+See [project-deployment.md](project-deployment.md) for the full agent-level
+workflow and the boundary between application release records, deployment
+records, project documentation and project memory. The bundled CLI **validates
+these fields but does not execute \`deploy-project\`**.
