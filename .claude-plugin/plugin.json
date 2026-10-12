@@ -1,0 +1,17 @@
+{
+  "name": "maintain-server-containers",
+  "version": "0.1.0",
+  "description": "Portable Docker Compose container maintenance with safe, policy-driven workflows.",
+  "author": {
+    "name": "Sergej DAGDA",
+    "url": "https://github.com/SergejDAGDA"
+  },
+  "homepage": "https://github.com/SergejDAGDA/agent-maintain-server-containers",
+  "repository": "https://github.com/SergejDAGDA/agent-maintain-server-containers",
+  "license": "MIT",
+  "keywords": [
+    "docker",
+    "maintenance",
+    "agent-skills"
+  ]
+}

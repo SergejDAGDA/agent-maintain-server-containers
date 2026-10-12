@@ -1,0 +1,10 @@
+{
+  "name": "Sergej DAGDA Agent Skills",
+  "plugins": [
+    {
+      "name": "maintain-server-containers",
+      "source": "../..",
+      "description": "Portable policy-driven Docker maintenance skill"
+    }
+  ]
+}
