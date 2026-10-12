@@ -88,9 +88,9 @@ def normalize(data: dict) -> tuple[list[dict], list[str]]:
         seen.add(name)
         policy = entry.get("policy")
         ownership = entry.get("ownership")
-        if policy not in POLICIES:
+        if not isinstance(policy, str) or policy not in POLICIES:
             errors.append(f"{name}: invalid or missing policy")
-        if ownership not in OWNERS:
+        if not isinstance(ownership, str) or ownership not in OWNERS:
             errors.append(f"{name}: invalid or missing ownership")
         for field in ("deployment", "state", "backup", "rollback", "health", "smoke", "target"):
             if field in entry and not isinstance(entry[field], dict):
@@ -324,21 +324,47 @@ def main(argv: list[str] | None = None) -> int:
         services, errors = normalize(data)
         if args.live and args.runtime_json:
             raise PolicyError("--live and --runtime-json cannot be combined")
+        # Resolve all declared policy blockers *before* any access to Docker
+        # or synthetic runtime inputs. A malformed policy must never initiate
+        # even read-only live inspection.
+        service_errors = {}
+        for service in services:
+            if service.get("policy") in {"MANUAL", "NO_TOUCH"}:
+                service_errors[service["name"]] = []
+                continue
+            problems = validate_service(service)
+            service_errors[service["name"]] = problems
+            errors.extend(f"{service['name']}: {issue}" for issue in problems)
         evidence = {}
-        if args.runtime_json:
+        if not errors and args.runtime_json:
             evidence = _mapping(json.loads(args.runtime_json.read_text(encoding="utf-8")),
                                 "Runtime evidence")
         if args.operation == "validate":
-            for service in services:
-                for issue in validate_service(service):
-                    # Record blockers for actionable update classes only.
-                    if service.get("policy") not in {"MANUAL", "NO_TOUCH"}:
-                        errors.append(f"{service['name']}: {issue}")
             result = {"schema_version": POLICY_VERSION, "services": len(services),
                       "valid": not errors, "errors": errors}
         else:
-            records = [assessment(s, docker_snapshot(s) if args.live else evidence.get(s["name"]))
-                       for s in services]
+            if errors:
+                records = []
+                for service in services:
+                    cls = service.get("policy")
+                    status = ("EXCLUDED" if cls == "NO_TOUCH" else
+                              "MANUAL_REVIEW" if cls == "MANUAL" else "BLOCKED")
+                    problems = service_errors.get(service["name"], [])
+                    if status == "BLOCKED":
+                        problems = [*problems, "policy invalid: runtime inspection skipped"]
+                    records.append({
+                        "name": service["name"],
+                        "policy": cls,
+                        "ownership": service.get("ownership"),
+                        "classification": status,
+                        "issues": problems,
+                        "runtime": {"status": "NOT_CHECKED"},
+                        "release_management": service.get("release_management"),
+                        "proposed_target": None,
+                    })
+            else:
+                records = [assessment(s, docker_snapshot(s) if args.live else evidence.get(s["name"]))
+                           for s in services]
             result = {"operation": args.operation, "read_only": True,
                       "policy_valid": not errors, "errors": errors,
                       "services": records,
