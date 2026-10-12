@@ -58,8 +58,19 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
         if key in policy and not _obj(policy[key]):
             errors.append(f"{key} must be a mapping")
     classes = policy.get("classes", {})
-    if _obj(classes) and set(classes) != POLICIES:
-        errors.append("classes must define all five supported policies without unknown classes")
+    if _obj(classes):
+        if set(classes) != POLICIES:
+            errors.append("classes must define all five supported policies without unknown classes")
+        else:
+            for name, expected in (("AUTO_SAFE", True), ("AUTO_GATED", True),
+                                   ("MANUAL", False), ("PIN_ONLY", True),
+                                   ("NO_TOUCH", False)):
+                settings = classes[name]
+                if not _obj(settings) or settings.get("mutation_allowed") is not expected:
+                    errors.append(f"classes.{name}.mutation_allowed contradicts policy")
+            if (_obj(classes["PIN_ONLY"]) and
+                    classes["PIN_ONLY"].get("application_content_upgrade_allowed") is not False):
+                errors.append("PIN_ONLY must forbid application content upgrades")
     invariants = policy.get("safety_invariants", {})
     if _obj(invariants):
         required = {
@@ -128,7 +139,7 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             names = ident.get("compose_services")
             if not isinstance(names, list) or not names or not all(_safe_name(x) for x in names):
                 errors.append(f"{name}: identity.compose_services invalid")
-        if cls == "NO_TOUCH" and service.get("no_touch", {}).get("enabled") is not True:
+        if cls == "NO_TOUCH" and (_obj(service.get("no_touch")) and service["no_touch"].get("enabled") is not True):
             errors.append(f"{name}: NO_TOUCH must have no_touch.enabled=true")
         if owner in ("external_admin", "unknown") and cls in ("AUTO_SAFE", "AUTO_GATED", "PIN_ONLY"):
             errors.append(f"{name}: external/unknown ownership cannot be automatic")
@@ -136,7 +147,7 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             b = service.get("backup")
             if _obj(b) and b.get("required") is not True:
                 errors.append(f"{name}: automatic mutation requires service backup")
-            if not service.get("deployment", {}).get("source_reproducible", False):
+            if _obj(service.get("deployment")) and not service["deployment"].get("source_reproducible", False):
                 warnings.append(f"{name}: deployment not proven reproducible")
     groups = policy.get("service_groups", {})
     if _obj(groups):
@@ -232,7 +243,7 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                 issues.append("state contract incomplete")
             if not service.get("deployment", {}).get("source_reproducible", False):
                 issues.append("deployment not proven reproducible")
-            if not service.get("backup", {}).get("required", False):
+            if _obj(service.get("backup")) and not service["backup"].get("required", False):
                 issues.append("backup requirement missing")
             group = _records_for_group(policy, service, services)
             if any(s.get("policy_class") in ("MANUAL", "NO_TOUCH") for s in group):
