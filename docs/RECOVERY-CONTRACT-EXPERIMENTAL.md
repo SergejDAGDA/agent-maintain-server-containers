@@ -312,3 +312,42 @@ host adversary. A successful signature cannot establish physical domain
 independence or automatically permit any real-world change. Adding the
 `cryptography` verification dependency to source requirements is not
 a v0.2.0 release or installed-skill update.
+
+## SQLite rollback-detection using externally pinned signed state (H27)
+
+`ledger_continuity_contract.py` is a read-only verifier for the logical
+contents of the already-existing `witness_used` and `witness_revoked`
+tables. It validates the filesystem-backed SQLite connection supplied by
+reviewed code, checks the schema, reads a consistent snapshot of both tables
+and produces a deterministic domain-separated SHA-256 digest plus row counts.
+It does not write to the journal or expose table contents in diagnostics.
+Unknown rows, missing tables, concurrent caller transactions or corrupt
+databases fail closed.
+
+A `witness-ledger-anchor/v1` statement binds a logical ledger ID, digest,
+counts, revision (total recorded event count), nonce, signer/key identities,
+and bounded validity times. Verification requires **both** a valid Ed25519
+signature from a pre-registered public key and an exact
+`expected_current_anchor_id` provided separately by trusted calling code.
+A previously valid signature cannot pass when an actually current,
+independently secured anchor ID is supplied and the SQLite file is rolled
+back to older state. A different journal or altered rows likewise mismatch.
+This is a read-only comparison, not a ledger updater or anchor publisher.
+
+H27 stores a copy of a **synthetic** SQLite journal before witness-key
+revocation, signs its subsequent state after revocation, and confirms the
+current state matches while the older SQLite copy and an old signed statement
+are refused against the new anchor ID. It runs entirely inside the ephemeral
+GitHub runner, after H26, without real server or user files.
+
+**Critical limitation:** This code has no independent high-watermark
+service, protected publication path, monotonic counter, remote witness or
+authenticated clock. H27 **simulates** an independent anchor by passing a
+pin from its test code. If an adversary can replace the journal AND the
+latest expected ID, it can replay a matching old signed anchor. Signatures
+are not proof of physical independence, and SQLite contents can be modified
+by privileged host access. The caller must obtain the genuinely latest
+anchor ID from a separately protected and freshness-verified authority
+before any reliable rollback decision. In the absence of such an authority,
+this verification is not production rollback protection. No status
+authorizes restore, deploy, update, deletion or off-host recovery claims.
