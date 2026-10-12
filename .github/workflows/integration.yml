@@ -1,0 +1,35 @@
+name: Disposable Compose recovery fixture
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/integration.yml"
+      - "tests/integration/**"
+      - "tests/test_integration_contract.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/integration.yml"
+      - "tests/integration/**"
+      - "tests/test_integration_contract.py"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      MSC_DISPOSABLE_TEST_RUNNER: isolated-ci-fixture-v1
+    steps:
+      - name: Checkout public synthetic fixtures
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Run offline recovery regressions
+        run: python -B -m unittest discover -s tests -p test_integration_contract.py -v
+      - name: Test disposable Compose startup, restore, corruption refusal and cleanup
+        run: python -B tests/integration/harness.py --run
