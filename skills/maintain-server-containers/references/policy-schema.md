@@ -59,7 +59,9 @@ A project with a pre-existing differently shaped `services.yaml` must map it to 
 
 The CLI also accepts an extended family of policies identified by `schema: <project>-maintenance/v1` and `policy_revision: 1`. This is a generic structural adapter, not a service-specific driver. Typical extended entries use `policy_class`, `identity.compose_project`, `identity.compose_services`, `deployment.server_source`, `state_contract.completeness`, `backup`, `migration`, `smoke`, `rollback`, and `dependencies`. A top-level `service_groups` mapping may describe composite stacks and subcomponents.
 
-The adapter validates the presence of safety invariants and mutation-reporting dimensions. It leaves unknown migration gates unresolved. A group may refer to a subcomponent with a different policy logical name. Such aliases are reported for review, never invented or silently considered safe. `NO_TOUCH` records are excluded without Docker inspection. `MANUAL` records remain manual. A service with a declared `complete` contract is still **not** automatically ready for update: current upstream release, recovery evidence, precise target, topology, and smoke must be independently proved.
+The adapter validates safety invariants, mutation-reporting dimensions and actionable service declarations: explicit state boundaries, strict boolean reproducibility/backup gates, migration and rollback semantics, topology, health, and smoke expectations. For `AUTO_SAFE`, image/source-only rollback must be declared unambiguously. `validate` now returns errors for unresolved safety-critical declarations even when the YAML parses. This is deliberately fail-closed: a consuming project may need to clarify legacy `complete` state contracts whose individual fields still say `unknown`. It never mutates that project's policy. It leaves unknown migration gates unresolved. A group may refer to a subcomponent with a different policy logical name. Such aliases are reported for review, never invented or silently considered safe. `NO_TOUCH` records are excluded without Docker inspection. `MANUAL` records remain manual. For evidence-bearing scalar fields, `[]` is **not** a valid recovery method, rollback identity, smoke profile or instance identity; empty lists remain valid only where the state schema expressly permits an empty inventory. Unknown security invariants are validation errors. In both supported schemas, a malformed policy stops `--live` before Docker inspection but still reports service inventory as blocked, manual or excluded.
+
+A service with a declared `complete` contract is still **not** automatically ready for update: current upstream release, recovery evidence, precise target, topology, and smoke must be independently proved.
 
 The adapter is intentionally read-only. It does not translate the rich policy back into the simplified portable format or write to the original file. See `examples/native-policy.yaml` for synthetic data.
 
@@ -93,3 +95,47 @@ makes structural validation **FAIL** rather than merely warning. A group
 containing a `MANUAL` or `NO_TOUCH` policy member remains blocked for
 automatic updates. Aliases do not grant new ownership or change the policies of
 the underlying service records.
+
+
+## Release-management strategy (optional)
+
+A project that builds its own application releases can declare a **release strategy**
+independent of the safety class. This is not an update executor or a required
+migration of existing policies:
+
+```yaml
+name: local-editor
+policy_class: MANUAL
+ownership: application_project
+release_management:
+  strategy: project_managed
+  release_authority: application_project
+  version_monitoring: false
+  automatic_updates: false
+```
+
+`release_management` accepts only the four documented fields. Unknown fields invalidate the policy, and no arbitrary field/value is emitted in JSON reports. Use separate project-owned configuration for additional metadata and secrets.
+
+Extended policies require declared dependency-group references and a valid Compose project identity for automatic candidates. An undeclared or mismatched dependency group fails validation; it is not silently treated as a standalone service. Unknown **global** `safety_invariants` also fail closed unless each extra rule is explicitly claimed and validated by a version/digest-matched, trusted in-process adapter supplied by the consuming project. The default CLI does not load plugins from policy paths. See [safety-adapter.md](safety-adapter.md); no generic whitelist or optional adapter can override the core rules.
+
+The same `release_management` fields are understood by portable and extended
+policies. Accepted strategies: `upstream_managed`, `project_managed`, and
+`externally_managed`. Accepted release authorities: `upstream_project`, `application_project`,
+`deployment_project`, and `external_admin`.
+
+A `project_managed` service requires `MANUAL` or `NO_TOUCH`, must set
+`version_monitoring: false` and `automatic_updates: false`, and is never
+included in `update-auto`. A targeted `deploy-project` may use a
+project-approved release of a `MANUAL` service only after its normal safety,
+ownership, backup and rollback gates pass. `NO_TOUCH` requires a separate
+expressly authorized workstream before any mutation. External administration
+cannot be silently overridden.
+
+This setting is optional. When absent, the agent must establish release
+authority from the project and runtime rather than assuming that public
+GitHub releases, private Git `HEAD`, or a Docker tag are authoritative.
+
+See [project-deployment.md](project-deployment.md) for the full agent-level
+workflow and the boundary between application release records, deployment
+records, project documentation and project memory. The bundled CLI **validates
+these fields but does not execute `deploy-project`**.

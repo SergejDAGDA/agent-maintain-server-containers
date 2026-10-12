@@ -1,4 +1,4 @@
 interface:
   display_name: "Maintain Server Containers"
-  short_description: "Audit, plan and safely maintain Docker Compose services"
-  default_prompt: "Use $maintain-server-containers to audit the current Docker Compose deployment and project policy. Start read-only unless I explicitly request an update. Preserve persistent state and enforce ownership, backup, migration and rollback gates."
+  short_description: "Audit, plan and deploy approved Docker Compose project releases"
+  default_prompt: "Use $maintain-server-containers to audit the current Docker Compose deployment and project policy. Start read-only unless I explicitly request an update. For project-owned release deployments, follow the deploy-project workflow and maintain deployment-owned operational records; if the appropriate optional project-memory and documentation skills are installed and authorized, use them for checkpoints and maintained docs, otherwise report pending synchronization without inventing file changes. Preserve persistent state and enforce ownership, backup, migration and rollback gates."

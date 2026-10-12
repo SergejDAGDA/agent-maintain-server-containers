@@ -41,12 +41,14 @@ def _safe_name(value: Any) -> bool:
 
 
 def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[list[dict], list[str]]:
-    """Resolve exact policy or Compose identities with explicitly declared aliases.
+    """Resolve explicit policy/Compose identities, never from guessed aliases.
 
-    An alias always identifies both the policy record and its exact Compose
-    service. We never guess name normalization (hyphens, underscores, etc.).
+    A structurally invalid service must remain reportable as a service record,
+    but malformed identity/dependency values cannot participate in resolution.
     """
     problems: list[str] = []
+    if not _obj(group):
+        return [], ["group definition must be a mapping"]
     members = group.get("services")
     aliases = group.get("component_aliases", {})
     if not isinstance(members, list) or not members or not all(_safe_name(x) for x in members):
@@ -55,15 +57,26 @@ def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[l
         problems.append("duplicate group member")
     if not _obj(aliases):
         return [], problems + ["component_aliases must be a mapping"]
-    by_name = {service["name"]: service for service in services}
+    by_name = {service["name"]: service for service in services
+               if _obj(service) and _safe_name(service.get("name"))}
+
+    def service_identity(item: dict) -> list[str]:
+        identity = item.get("identity")
+        names = identity.get("compose_services") if _obj(identity) else None
+        return names if isinstance(names, list) and all(_safe_name(n) for n in names) else []
+
+    def service_group(item: dict) -> str | None:
+        deps = item.get("dependencies")
+        return deps.get("update_group") if _obj(deps) else None
+
     resolved: list[dict] = []
     for alias_key in aliases:
         if alias_key not in members:
             problems.append(f"alias {alias_key}: not listed in group services")
     for member in members:
         exact_name = by_name.get(member)
-        exact_compose = [s for s in services
-                         if member in (s.get("identity", {}).get("compose_services") or [])]
+        exact_compose = [item for item in by_name.values()
+                         if member in service_identity(item)]
         if member in aliases:
             alias = aliases[member]
             if exact_name or exact_compose:
@@ -78,28 +91,31 @@ def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[l
             if owner is None or not _safe_name(compose_name):
                 problems.append(f"component {member}: alias owner or Compose name invalid")
                 continue
-            owner_services = owner.get("identity", {}).get("compose_services") or []
-            if compose_name not in owner_services:
+            if compose_name not in service_identity(owner):
                 problems.append(f"component {member}: alias Compose service not in owning record")
                 continue
-            target_group = owner.get("dependencies", {}).get("update_group")
-            if target_group != group_name:
+            if service_group(owner) != group_name:
                 problems.append(f"component {member}: alias policy owner belongs to another group")
                 continue
             resolved.append(owner)
         elif exact_name:
-            resolved.append(exact_name)
+            if service_group(exact_name) != group_name:
+                problems.append(f"component {member}: policy owner belongs to another group")
+            else:
+                resolved.append(exact_name)
         elif len(exact_compose) == 1:
-            resolved.append(exact_compose[0])
+            if service_group(exact_compose[0]) != group_name:
+                problems.append(f"component {member}: Compose owner belongs to another group")
+            else:
+                resolved.append(exact_compose[0])
         elif len(exact_compose) > 1:
             problems.append(f"component {member}: ambiguous Compose service identity")
         else:
             problems.append(f"component {member}: unresolved; declare an explicit component_aliases entry")
-    unique = {s["name"]: s for s in resolved}
-    return list(unique.values()), problems
+    return list({item["name"]: item for item in resolved}.values()), problems
 
 
-def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
+def structure(policy: dict, *, trusted_adapters: dict | None = None) -> tuple[list[dict], list[str], list[str]]:
     """Validate structural shape. Return service records, fatal errors and warnings.
 
     Compatibility does not mean that an update is authorized.
@@ -138,8 +154,12 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             "external_or_unknown_ownership": "never_automatic",
             "security_release_gate_bypass": "prohibited",
         }
+        from safety_adapter import validate_adapter_claims
+        errors.extend(validate_adapter_claims(
+            policy, frozenset(required), registry=trusted_adapters
+        ))
         for key, expected in required.items():
-            if invariants.get(key) != expected:
+            if invariants.get(key) != expected or type(invariants.get(key)) is not type(expected):
                 errors.append(f"required safety invariant missing or changed: {key}")
     report = policy.get("mutation_reporting", {})
     if _obj(report):
@@ -168,11 +188,16 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             continue
         seen.add(name)
         services.append(service)
+        from release_management import validate_release_management
+        errors.extend(validate_release_management(service, class_field="policy_class"))
         cls = service.get("policy_class")
+        from native_safety import safety_issues
+        for finding in safety_issues(service):
+            errors.append(f"{name}: {finding}")
         owner = service.get("ownership")
-        if cls not in POLICIES:
+        if not isinstance(cls, str) or cls not in POLICIES:
             errors.append(f"{name}: unsupported policy_class")
-        if owner not in OWNERS:
+        if not isinstance(owner, str) or owner not in OWNERS:
             errors.append(f"{name}: unsupported ownership")
         for key in ("identity", "deployment", "image", "upstream",
                     "version_policy", "state_contract", "backup", "migration",
@@ -195,9 +220,21 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
                 warnings.append(f"{name}: incomplete state blocks automatic updates")
         ident = service.get("identity")
         if _obj(ident):
+            if cls in ("AUTO_SAFE", "AUTO_GATED", "PIN_ONLY") and not _safe_name(ident.get("compose_project")):
+                errors.append(f"{name}: identity.compose_project invalid")
+            elif ("compose_project" in ident and ident.get("compose_project") is not None
+                  and not _safe_name(ident.get("compose_project"))):
+                errors.append(f"{name}: identity.compose_project malformed")
             names = ident.get("compose_services")
             if not isinstance(names, list) or not names or not all(_safe_name(x) for x in names):
                 errors.append(f"{name}: identity.compose_services invalid")
+        deps = service.get("dependencies")
+        if _obj(deps) and "update_group" in deps:
+            group_name = deps["update_group"]
+            if group_name is not None and not _safe_name(group_name):
+                errors.append(f"{name}: dependencies.update_group must be null or a valid non-empty group name")
+            elif group_name is not None and (not _obj(policy.get("service_groups")) or group_name not in policy["service_groups"]):
+                errors.append(f"{name}: dependencies.update_group refers to undefined group")
         if cls == "NO_TOUCH" and (_obj(service.get("no_touch")) and service["no_touch"].get("enabled") is not True):
             errors.append(f"{name}: NO_TOUCH must have no_touch.enabled=true")
         if owner in ("external_admin", "unknown") and cls in ("AUTO_SAFE", "AUTO_GATED", "PIN_ONLY"):
@@ -245,23 +282,21 @@ def _runtime(service: dict) -> dict:
             )
             if p.returncode:
                 return {"status": "UNVERIFIED", "reason": "Docker unavailable"}
+            if not isinstance(p.stdout, str):
+                return {"status": "UNVERIFIED", "reason": "Docker container listing unavailable"}
             ids = [s for s in p.stdout.splitlines() if s]
             if len(ids) != 1:
                 return {"status": "UNVERIFIED", "reason": "Compose service not unique"}
+            from native_runtime import INSPECT_TEMPLATE, parse_targeted_inspect
             q = subprocess.run(
-                ["docker", "inspect", "--format", "{{json .}}", ids[0]],
+                ["docker", "inspect", "--format", INSPECT_TEMPLATE, ids[0]],
                 capture_output=True, text=True, timeout=15, check=False
             )
             if q.returncode:
                 return {"status": "UNVERIFIED", "reason": "Docker inspect unavailable"}
-            obj = json.loads(q.stdout)
-            results.append({
-                "service": name,
-                "image_id": obj.get("Image"),
-                "configured_image": obj.get("Config", {}).get("Image"),
-                "running": obj.get("State", {}).get("Running"),
-                "health": obj.get("State", {}).get("Health", {}).get("Status", "no_healthcheck")
-            })
+            snap = parse_targeted_inspect(q.stdout)
+            snap["service"] = name
+            results.append(snap)
         except (OSError, subprocess.TimeoutExpired, ValueError, TypeError):
             return {"status": "UNVERIFIED", "reason": "Docker inspection unavailable"}
     return {"status": "OBSERVED", "services": results}
@@ -271,8 +306,12 @@ def _records_for_group(policy: dict, service: dict, services: list[dict]) -> tup
     dep = service.get("dependencies", {})
     group_name = dep.get("update_group") if _obj(dep) else None
     groups = policy.get("service_groups", {})
-    if not group_name or not _obj(groups) or group_name not in groups:
+    if group_name is None:
         return [], []
+    if not _safe_name(group_name):
+        return [], ["dependency group name invalid"]
+    if not _obj(groups) or group_name not in groups:
+        return [], ["declared dependency group undefined"]
     group = groups[group_name]
     if not _obj(group):
         return [], ["dependency group definition invalid"]
@@ -280,6 +319,7 @@ def _records_for_group(policy: dict, service: dict, services: list[dict]) -> tup
 
 
 def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> list[dict]:
+    from release_management import public_release_management
     results = []
     for service in services:
         name = service["name"]
@@ -295,6 +335,9 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
             result = "GATED"
             if owner in ("external_admin", "unknown"):
                 issues.append("ownership excludes automatic maintenance")
+            from native_safety import safety_issues
+            for finding in safety_issues(service):
+                issues.append(f"policy safety contract invalid: {finding}")
             state = service.get("state_contract", {})
             if not _obj(state) or state.get("completeness") != "complete":
                 issues.append("state contract incomplete")
@@ -321,14 +364,26 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                 observed = _runtime(service)
                 if observed.get("status") != "OBSERVED":
                     issues.append("live runtime identity unverified")
-                elif not all(x.get("running") for x in observed["services"]):
-                    issues.append("one or more Compose services not running")
+                else:
+                    from native_runtime import contract_differences
+                    drifts = contract_differences(service, observed["services"])
+                    observed["contract_status"] = (
+                        "DRIFT" if drifts else "METADATA_MATCH_ONLY"
+                    )
+                    observed["contract_differences"] = drifts
+                    if drifts:
+                        issues.append("runtime policy metadata drift detected")
+                    # Even when metadata matches, Compose render, backup/restore
+                    # and application smoke remain independently unverified.
+                    issues.append("Compose source/backup/restore/smoke still require independent proof")
             else:
                 issues.append("live runtime not inspected")
             if cls == "PIN_ONLY":
                 issues.append("PIN_ONLY may not change application contents")
             if issues:
                 result = "BLOCKED" if any(
+                    x.startswith("policy safety contract invalid:") for x in issues
+                ) or any(
                     x in issues for x in (
                         "ownership excludes automatic maintenance",
                         "state contract incomplete",
@@ -338,6 +393,7 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                         "dependency group membership unresolved",
                         "one or more Compose services not running",
                         "live runtime identity unverified",
+                        "runtime policy metadata drift detected",
                     )
                 ) else "GATED"
         results.append({
@@ -348,5 +404,6 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
             "issues": issues,
             "runtime": observed,
             "target_candidate": service.get("version_policy", {}).get("target_candidate"),
+            "release_management": public_release_management(service),
         })
     return results

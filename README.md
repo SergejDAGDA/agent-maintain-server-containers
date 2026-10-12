@@ -10,7 +10,7 @@ Installed skill name: `maintain-server-containers`
 
 Invocation: `$maintain-server-containers`
 
-**Status: v0.1.0 public preview.** The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
+**Status: v0.2.0 draft release candidate (not merged or installed).** The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
 ## Why
 
@@ -90,13 +90,80 @@ Update services eligible under the project policy, preserving user data and perf
 
 The last command is an *agent-level workflow request*, **not a command implemented by the bundled read-only Python CLI**. The agent must have the relevant authorized deployment and backup tools and must follow all gates in `SKILL.md`. It must not improvise a missing recovery mechanism.
 
+
+## Install a new third-party application from a repository
+
+The skill also defines `deploy-repository` for installing a new external application
+into an existing Compose server, starting with an explicit Git repository URL:
+
+```text
+$maintain-server-containers deploy-repository https://github.com/example-org/example-app
+Set it up as an isolated Docker Compose application on my server, check its
+dependencies, state and network exposure, and register it for future maintenance.
+```
+
+The agent inspects source/release metadata and upstream Dockerfiles/Compose as
+**untrusted input**, selects a reproducible version, checks conflicts with
+existing services, prepares deployment/configuration and protected persistent
+storage, performs the bounded initial deployment, verifies health and records
+the installed app in the server's existing maintenance policy.
+
+One explicit request covers normal reversible steps: the agent should not ask
+whether to create every folder or dependency. It must **not** silently grant
+privileged mode, host Docker socket access, broad writable mounts, expose
+administrative endpoints publicly, or overwrite existing user data. Missing
+third-party credentials or significant exposure/privilege changes require
+a focused decision. Generated secrets stay in protected storage, not Git or logs.
+
+A newly installed application defaults to `MANUAL` maintenance until an
+independent update-safety classification can be proven. Optional other
+Agent Skills never control whether core deployment can proceed.
+
+See [repository-deployment.md](skills/maintain-server-containers/references/repository-deployment.md)
+for the first-install protocol. This is an **agent-operated workflow**;
+the bundled read-only CLI is not yet a production installer.
+
+
+## Deploy a project-owned application release
+
+The skill also defines a targeted agent workflow for a release built by your own
+application project (including non-public repositories, packages and CI artifacts
+outside the Docker host):
+
+```text
+$maintain-server-containers deploy-project local-editor
+Deploy the latest approved deployable release, validate the running application,
+and synchronize the authorized deployment record and project memory.
+```
+
+The agent discovers existing project/build provenance, an approved release,
+durable Compose sources, persistent-state safety and an authoritative runtime
+baseline. **The newest source commit is not automatically a deployable release.**
+A project-managed application is not swept into ordinary `update-auto`.
+
+Once verified, it writes the deployment owner's existing operational record
+and uses `$maintain-project-memory` **Checkpoint** for relevant project
+coordination when available and authorized. It uses `$project-documentation`
+**update** only if maintained application docs actually changed. An active
+handoff is not created for a completed release. If the deployment succeeds
+but record synchronization does not, report `DEPLOYED_RECORD_SYNC_PENDING`,
+not a fabricated fully completed deployment.
+
+`MANUAL` requires a targeted authorized project workstream; `NO_TOUCH`
+**cannot** be bypassed by an ordinary `deploy-project` request.
+
+See [project-deployment.md](skills/maintain-server-containers/references/project-deployment.md)
+and the [synthetic policy example](examples/project-managed.yaml).
+The bundled Python CLI validates optional `release_management` declarations,
+but **does not implement the deployment command**.
+
 ## Project policy, not a hardcoded server
 
 The consuming project owns `maintenance/services.yaml`. The public skill contains only a synthetic example at [examples/services.yaml](examples/services.yaml).
 
 Portable v1 services can be declared with `services` as either a YAML list or a mapping. A candidate entry names its Compose project/service, image, explicit target, ownership, persistence contract, backup requirement, rollback class, health and smoke profile.
 
-Read [policy-schema.md](skills/maintain-server-containers/references/policy-schema.md) before using the schema in production. A pre-existing project-specific `services.yaml` is **not automatically compatible** merely because it has the same filename.
+Read [policy-schema.md](skills/maintain-server-containers/references/policy-schema.md) before using the schema in production. A pre-existing project-specific `services.yaml` is **not automatically compatible** merely because it has the same filename. Extra project-owned safety rules require the [trusted adapter contract](skills/maintain-server-containers/references/safety-adapter.md); the bundled CLI fails closed without an adapter and cannot import one from policy YAML.
 
 
 ### Component names in dependency groups
@@ -141,7 +208,7 @@ Do not store secrets, internal inventory, hostnames, tokens, user files or priva
 
 ## Current capability boundary
 
-| Capability | v0.1.0 |
+| Capability | v0.2.0 candidate |
 | --- | --- |
 | Policy schema validation | Implemented |
 | Read-only Compose container identity check | Implemented |

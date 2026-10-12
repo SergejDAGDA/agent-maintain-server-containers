@@ -13,6 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from release_management import public_release_management
 
 POLICIES = {"AUTO_SAFE", "AUTO_GATED", "MANUAL", "PIN_ONLY", "NO_TOUCH"}
 OWNERS = {"sandbox", "application_project", "external_admin", "unknown"}
@@ -60,14 +61,20 @@ def load_policy(path: Path) -> dict:
 def normalize(data: dict) -> tuple[list[dict], list[str]]:
     """Normalize the documented portable v1 schema. Never assume unknown fields are safe."""
     errors: list[str] = []
-    version = str(data.get("schema_version", ""))
-    if version != POLICY_VERSION:
+    version = data.get("schema_version")
+    if type(version) is not str or version != POLICY_VERSION:
         errors.append("schema_version must be '1' (explicit migration required)")
     raw = data.get("services")
     if isinstance(raw, dict):
         # Named mapping accepted for simple project configuration.
-        entries = [dict({"name": key}, **value) if isinstance(value, dict) and "name" not in value
-                   else value for key, value in raw.items()]
+        entries = []
+        for key, value in raw.items():
+            if isinstance(value, dict) and "name" not in value:
+                entry = dict(value)
+                entry["name"] = key
+                entries.append(entry)
+            else:
+                entries.append(value)
     elif isinstance(raw, list):
         entries = raw
     else:
@@ -88,13 +95,17 @@ def normalize(data: dict) -> tuple[list[dict], list[str]]:
         seen.add(name)
         policy = entry.get("policy")
         ownership = entry.get("ownership")
-        if policy not in POLICIES:
+        if not isinstance(policy, str) or policy not in POLICIES:
             errors.append(f"{name}: invalid or missing policy")
-        if ownership not in OWNERS:
+        if not isinstance(ownership, str) or ownership not in OWNERS:
             errors.append(f"{name}: invalid or missing ownership")
+        if any(not isinstance(key, str) for key in entry):
+            errors.append(f"{name}: service field keys must all be strings")
         for field in ("deployment", "state", "backup", "rollback", "health", "smoke", "target"):
             if field in entry and not isinstance(entry[field], dict):
                 errors.append(f"{name}: {field} must be a mapping")
+        from release_management import validate_release_management
+        errors.extend(validate_release_management(entry, class_field="policy"))
         normalized.append(entry)
     return normalized, errors
 
@@ -104,12 +115,14 @@ def validate_service(service: dict) -> list[str]:
     policy = service.get("policy")
     owner = service.get("ownership")
     issues: list[str] = []
-    if policy in {"MANUAL", "NO_TOUCH"}:
+    if isinstance(policy, str) and policy in {"MANUAL", "NO_TOUCH"}:
         return issues
-    if owner in {"external_admin", "unknown"}:
+    if isinstance(owner, str) and owner in {"external_admin", "unknown"}:
         issues.append("ownership not eligible for automated maintenance")
     state = service.get("state", {})
-    if not isinstance(state, dict) or state.get("complete") is not True:
+    if not isinstance(state, dict):
+        state = {}
+    if state.get("complete") is not True:
         issues.append("state contract not proven complete")
     for key in ("binds", "volumes", "databases", "user_files", "secret_refs"):
         if not isinstance(state.get(key), list):
@@ -124,7 +137,7 @@ def validate_service(service: dict) -> list[str]:
         service["image"].get("current"), str
     ):
         issues.append("current image identity missing")
-    if policy not in {"PIN_ONLY"}:
+    if policy != "PIN_ONLY":
         target = service.get("target", {})
         if not isinstance(target, dict) or not isinstance(target.get("image"), str):
             issues.append("explicit target image not specified")
@@ -134,7 +147,9 @@ def validate_service(service: dict) -> list[str]:
         ):
             issues.append("explicit immutable pin target missing")
     rollback = service.get("rollback", {})
-    if not isinstance(rollback, dict) or rollback.get("class") not in (
+    if not isinstance(rollback, dict):
+        rollback = {}
+    if rollback.get("class") not in (
         "image_only", "state_restore_required", "unknown"
     ):
         issues.append("rollback classification missing")
@@ -147,7 +162,9 @@ def validate_service(service: dict) -> list[str]:
     if not isinstance(service.get("smoke"), dict):
         issues.append("smoke profile contract missing")
     backup = service.get("backup", {})
-    if not isinstance(backup, dict) or not isinstance(backup.get("required"), bool):
+    if not isinstance(backup, dict):
+        backup = {}
+    if type(backup.get("required")) is not bool:
         issues.append("backup requirement not declared")
     if policy == "AUTO_GATED" and backup.get("required") is not True:
         issues.append("AUTO_GATED requires backup gate")
@@ -170,6 +187,8 @@ def docker_snapshot(service: dict) -> dict:
         proc = subprocess.run(command, text=True, capture_output=True, timeout=15, check=False)
         if proc.returncode:
             return {"status": "unverified", "reason": "docker unavailable"}
+        if not isinstance(proc.stdout, str):
+            return {"status": "unverified", "reason": "container listing unavailable"}
         ids = [s for s in proc.stdout.splitlines() if s]
         if len(ids) != 1:
             return {"status": "unverified", "reason": "expected exactly one Compose container"}
@@ -179,18 +198,48 @@ def docker_snapshot(service: dict) -> dict:
         if proc.returncode:
             return {"status": "unverified", "reason": "inspect unavailable"}
         obj = json.loads(proc.stdout)
-        state = obj.get("State", {})
+        # Docker inspect is external input. Its shape is not guaranteed; do
+        # not allow malformed values to escape as AttributeError or accidentally
+        # be promoted to independently verified runtime evidence.
+        if not isinstance(obj, dict):
+            raise ValueError("malformed Docker inspect root")
+        state = obj.get("State")
+        config = obj.get("Config")
+        mounts = obj.get("Mounts")
+        if not isinstance(state, dict) or not isinstance(config, dict):
+            raise ValueError("malformed Docker state/config")
+        if not isinstance(mounts, list):
+            raise ValueError("malformed Docker mounts")
+        if not (isinstance(obj.get("Image"), str)
+                and isinstance(config.get("Image"), str)
+                and type(state.get("Running")) is bool
+                and isinstance(obj.get("Id"), str)):
+            raise ValueError("incomplete Docker runtime identity")
+        health = state.get("Health")
+        if health is not None and not isinstance(health, dict):
+            raise ValueError("malformed Docker health")
+        if health is not None and not isinstance(health.get("Status"), str):
+            raise ValueError("malformed Docker health status")
+        normalized_mounts = set()
+        for m in mounts:
+            if not isinstance(m, dict):
+                raise ValueError("malformed Docker mount")
+            if (not isinstance(m.get("Type"), str)
+                    or not isinstance(m.get("Destination"), str)
+                    or type(m.get("RW")) is not bool):
+                raise ValueError("malformed Docker mount attributes")
+            source = m.get("Name") or m.get("Source")
+            if not isinstance(source, str):
+                raise ValueError("malformed Docker mount source")
+            normalized_mounts.add((m["Type"], source, m["Destination"], not m["RW"]))
         return {
             "status": "verified",
-            "image_id": obj.get("Image"),
-            "configured_image": obj.get("Config", {}).get("Image"),
-            "running": state.get("Running"),
-            "health": state.get("Health", {}).get("Status", "none"),
-            "container_id": obj.get("Id"),
-            "mounts": sorted({
-                (m.get("Type"), m.get("Name") or m.get("Source"), m.get("Destination"),
-                 not bool(m.get("RW", True))) for m in obj.get("Mounts", [])
-            }, key=str),
+            "image_id": obj["Image"],
+            "configured_image": config["Image"],
+            "running": state["Running"],
+            "health": health["Status"] if health is not None else "none",
+            "container_id": obj["Id"],
+            "mounts": sorted(normalized_mounts, key=str),
         }
     except (OSError, subprocess.TimeoutExpired, ValueError, TypeError):
         return {"status": "unverified", "reason": "runtime inspection unavailable"}
@@ -237,6 +286,7 @@ def assessment(service: dict, runtime: dict | None) -> dict:
             "configured_image": r.get("configured_image"),
             "image_id": r.get("image_id")
         },
+        "release_management": public_release_management(service),
         "proposed_target": (service.get("target", {}).get("image")
                             if isinstance(service.get("target"), dict) else None),
     }
@@ -265,10 +315,31 @@ def main(argv: list[str] | None = None) -> int:
                     "valid": not errors,
                     "errors": errors,
                     "warnings": warnings,
-                    "note": "Structural compatibility is not authorization or proof of recovery."
+                    "note": "Structural and semantic policy checks are not backup/restore or runtime verification."
                 }
             else:
-                records = [] if errors else assess_native(data, services, live=args.live)
+                if errors:
+                    # Preserve a useful per-service inventory while guaranteeing that
+                    # an invalid policy never triggers even read-only live inspection.
+                    records = []
+                    for svc in services:
+                        service_name = svc["name"]
+                        cls = svc.get("policy_class")
+                        classification = ("EXCLUDED" if cls == "NO_TOUCH" else
+                                          "MANUAL_REVIEW" if cls == "MANUAL" else "BLOCKED")
+                        problems = [e for e in errors if e.startswith(service_name + ":")]
+                        if cls not in ("MANUAL", "NO_TOUCH"):
+                            problems.append("policy invalid: runtime inspection skipped; update forbidden")
+                        records.append({
+                            "name": service_name, "policy": cls,
+                            "ownership": svc.get("ownership"),
+                            "classification": classification, "issues": problems,
+                            "runtime": {"status": "NOT_CHECKED"},
+                            "target_candidate": None,
+                            "release_management": public_release_management(svc)
+                        })
+                else:
+                    records = assess_native(data, services, live=args.live)
                 result = {
                     "operation": args.operation,
                     "read_only": True,
@@ -300,21 +371,48 @@ def main(argv: list[str] | None = None) -> int:
         services, errors = normalize(data)
         if args.live and args.runtime_json:
             raise PolicyError("--live and --runtime-json cannot be combined")
+        # Resolve all declared policy blockers *before* any access to Docker
+        # or synthetic runtime inputs. A malformed policy must never initiate
+        # even read-only live inspection.
+        service_errors = {}
+        for service in services:
+            service_class = service.get("policy")
+            if isinstance(service_class, str) and service_class in {"MANUAL", "NO_TOUCH"}:
+                service_errors[service["name"]] = []
+                continue
+            problems = validate_service(service)
+            service_errors[service["name"]] = problems
+            errors.extend(f"{service['name']}: {issue}" for issue in problems)
         evidence = {}
-        if args.runtime_json:
+        if not errors and args.runtime_json:
             evidence = _mapping(json.loads(args.runtime_json.read_text(encoding="utf-8")),
                                 "Runtime evidence")
         if args.operation == "validate":
-            for service in services:
-                for issue in validate_service(service):
-                    # Record blockers for actionable update classes only.
-                    if service.get("policy") not in {"MANUAL", "NO_TOUCH"}:
-                        errors.append(f"{service['name']}: {issue}")
             result = {"schema_version": POLICY_VERSION, "services": len(services),
                       "valid": not errors, "errors": errors}
         else:
-            records = [assessment(s, docker_snapshot(s) if args.live else evidence.get(s["name"]))
-                       for s in services]
+            if errors:
+                records = []
+                for service in services:
+                    cls = service.get("policy")
+                    status = ("EXCLUDED" if cls == "NO_TOUCH" else
+                              "MANUAL_REVIEW" if cls == "MANUAL" else "BLOCKED")
+                    problems = service_errors.get(service["name"], [])
+                    if status == "BLOCKED":
+                        problems = [*problems, "policy invalid: runtime inspection skipped"]
+                    records.append({
+                        "name": service["name"],
+                        "policy": cls,
+                        "ownership": service.get("ownership"),
+                        "classification": status,
+                        "issues": problems,
+                        "runtime": {"status": "NOT_CHECKED"},
+                        "release_management": public_release_management(service),
+                        "proposed_target": None,
+                    })
+            else:
+                records = [assessment(s, docker_snapshot(s) if args.live else evidence.get(s["name"]))
+                           for s in services]
             result = {"operation": args.operation, "read_only": True,
                       "policy_valid": not errors, "errors": errors,
                       "services": records,
