@@ -90,6 +90,40 @@ Update services eligible under the project policy, preserving user data and perf
 
 The last command is an *agent-level workflow request*, **not a command implemented by the bundled read-only Python CLI**. The agent must have the relevant authorized deployment and backup tools and must follow all gates in `SKILL.md`. It must not improvise a missing recovery mechanism.
 
+
+## Deploy a project-owned application release
+
+The skill also defines a targeted agent workflow for a release built by your own
+application project (including non-public repositories, packages and CI artifacts
+outside the Docker host):
+
+```text
+$maintain-server-containers deploy-project local-editor
+Deploy the latest approved deployable release, validate the running application,
+and synchronize the authorized deployment record and project memory.
+```
+
+The agent discovers existing project/build provenance, an approved release,
+durable Compose sources, persistent-state safety and an authoritative runtime
+baseline. **The newest source commit is not automatically a deployable release.**
+A project-managed application is not swept into ordinary `update-auto`.
+
+Once verified, it writes the deployment owner's existing operational record
+and uses `$maintain-project-memory` **Checkpoint** for relevant project
+coordination when available and authorized. It uses `$project-documentation`
+**update** only if maintained application docs actually changed. An active
+handoff is not created for a completed release. If the deployment succeeds
+but record synchronization does not, report `DEPLOYED_RECORD_SYNC_PENDING`,
+not a fabricated fully completed deployment.
+
+`MANUAL` requires a targeted authorized project workstream; `NO_TOUCH`
+**cannot** be bypassed by an ordinary `deploy-project` request.
+
+See [project-deployment.md](skills/maintain-server-containers/references/project-deployment.md)
+and the [synthetic policy example](examples/project-managed.yaml).
+The bundled Python CLI validates optional `release_management` declarations,
+but **does not implement the deployment command**.
+
 ## Project policy, not a hardcoded server
 
 The consuming project owns `maintenance/services.yaml`. The public skill contains only a synthetic example at [examples/services.yaml](examples/services.yaml).
