@@ -71,8 +71,7 @@ fail policy validation. Error reports omit arbitrary policy keys, values and
 exception messages. No values from `Env`, secrets, volumes or logs belong
 in adapter reports.
 
-The optional `check_service(service, evidence, phase)` protocol uses the same
-statuses and additive restrictions for `plan`, `pre_mutation`,
+The optional `check_service(service, evidence, phase)` protocol must return **exactly one result per registered invariant claim for each service and phase**, without missing or extra checks. It uses the same statuses and additive restrictions for `plan`, `pre_mutation`,
 `post_deploy` and `restore` phases. The bundled read-only CLI does not
 invoke this phase-level callback; a future tested executor must verify every
 required project gate as well as the core safety policy.
