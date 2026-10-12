@@ -37,7 +37,7 @@ python skills/maintain-server-containers/scripts/maintenance.py --policy mainten
 python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live status
 ```
 
-The helper runs only read-only Docker `ps` and `inspect` and does not change application state. It supports the portable v1 schema. Existing project policies may require an adapter. A `GATED` or `CANDIDATE` classification never constitutes release, backup or rollback approval. If runtime/policy disagree, reconcile *before* update, not by blindly recreating containers.
+The helper runs only read-only Docker `ps` and `inspect` and does not change application state. It supports the portable v1 schema and a generic read-only adapter for namespaced `<project>-maintenance/v1` policies with richer project-owned state contracts and groups. Other existing policies may require an explicit adapter. A `GATED` or `CANDIDATE` classification never constitutes release, backup or rollback approval. If runtime/policy disagree, reconcile *before* update, not by blindly recreating containers.
 
 ## Update policy
 
