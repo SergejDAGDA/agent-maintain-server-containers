@@ -31,6 +31,8 @@
 
 Навык не содержит частных IP-адресов, конфигураций конкретного сервера или секретов.
 
+**Совместимость с расширенными политиками:** помимо переносимой схемы `schema_version: "1"`, валидатор поддерживает именованные проектные схемы `<project>-maintenance/v1`, содержащие `policy_class`, `identity.compose_services`, `state_contract.completeness` и группы зависимостей. Исходный файл не переписывается. См. [синтетический пример](examples/native-policy.yaml). Совместимость формата не означает разрешение на обновление.
+
 ## Установка
 
 Совместимые с Agent Skills агенты используют канонический каталог:
@@ -51,13 +53,14 @@ skills/maintain-server-containers/
 python -m pip install -r skills/maintain-server-containers/scripts/requirements.txt
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml validate
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml plan
+python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml validate
 ```
 
 Чтение реальных Docker-метаданных без изменения состояния:
 
 ```sh
 python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live audit
-python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live status --format json
+python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live --format json status
 ```
 
 Параметры `--live` и `--format` следует ставить перед именем операции. Используются только Docker `ps` и `inspect` в режиме чтения.
