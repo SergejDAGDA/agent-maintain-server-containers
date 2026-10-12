@@ -39,6 +39,8 @@ sys.path.insert(0, str(HERE.parents[1] / "skills" / "maintain-server-containers"
 from recovery_contract import (  # noqa: E402
     plan_retention_dry_run, validate_checkpoint, validate_recovery_set,
 )
+from failure_domain_contract import assess_disaster_recovery  # noqa: E402
+from restic_fixture import ResticFixtureError  # noqa: E402
 
 
 def _checksum(data: bytes) -> str:
@@ -404,8 +406,46 @@ def run() -> None:
         if not pending.valid or pending.restore_tested:
             raise RuntimeError("premature PostgreSQL RESTORE_TESTED attestation")
         provider.reject_incorrect_password()
-        # The password-failure test must not alter the working snapshot.
+        # A vanished key prevents even repository inspection, then recovery
+        # must remain possible when this fixture-only key is put back.
+        parked_key = sandbox / "pg-key-temporarily-unavailable"
+        provider.password.rename(parked_key)
+        try:
+            try:
+                provider.check_pg(snapshot_id, package=checkpoint)
+            except ResticFixtureError:
+                pass
+            else:
+                raise RuntimeError("synthetic missing-key condition was accepted")
+        finally:
+            parked_key.rename(provider.password)
         provider.check_pg(snapshot_id, package=checkpoint)
+
+        # Test repository outage without deleting or modifying any snapshot.
+        parked_repository = sandbox / "pg-repository-temporarily-unavailable"
+        provider.repo.rename(parked_repository)
+        try:
+            try:
+                provider.check_pg(snapshot_id, package=checkpoint)
+            except ResticFixtureError:
+                pass
+            else:
+                raise RuntimeError("synthetic unavailable-repository condition was accepted")
+        finally:
+            parked_repository.rename(provider.repo)
+        provider.check_pg(snapshot_id, package=checkpoint)
+
+        # H22: simulate complete loss of the original SYNTHETIC node.
+        # State is in database tmpfs and the 3 generated source files are
+        # scoped to this disposable runner. Discard the staging package too.
+        # The original source path remains as an empty snapshot-identity
+        # locator only: no restore bytes may be loaded from it.
+        teardown(original_project, source)
+        shutil.rmtree(source)
+        shutil.rmtree(checkpoint)
+        checkpoint.mkdir()
+        if containers(original_project) or source.exists() or any(checkpoint.iterdir()):
+            raise RuntimeError("synthetic primary/state loss incomplete")
 
         recovered_package = provider.restore_pg(
             snapshot_id, package=checkpoint,
@@ -417,8 +457,8 @@ def run() -> None:
         restored_ids = start(restored_project, restored)
         restore_database(restored_ids, recovered_package, expected=seed)
         assert_group(restored_ids, restored, seed)
-        assert_group(original_ids, source, seed)
-        verify_package(checkpoint, expected=seed)
+        if source.exists() or any(checkpoint.iterdir()):
+            raise RuntimeError("synthetic recovery accidentally reused lost source")
         provider.check_pg(snapshot_id, package=checkpoint)
         proof["isolated_restore_tested"] = True
         proof["application_smoke_passed"] = True
@@ -430,12 +470,42 @@ def run() -> None:
         )
         if retention.blockers or retention.permitted_candidates or len(retention.protected) != 1:
             raise RuntimeError("PostgreSQL known-good checkpoint not protected")
+        # The local CI repository remains within the lost source host's
+        # failure domain. A successful synthetic restore must not imply
+        # independent off-host disaster-recovery evidence.
+        boundary = assess_disaster_recovery(
+            group_recovery, proof,
+            {
+                "schema": "failure-domain/v1",
+                "recovery_fingerprint": declaration.fingerprint,
+                "checkpoint_id": snapshot_id,
+                "source": {"node_id": "ci-primary", "fault_domain": "ci-runner"},
+                "repository": {"storage_id": "ci-local-restic",
+                               "fault_domain": "ci-runner", "storage_class": "on_host"},
+                "key_authority": {"authority_id": "ci-temporary-key",
+                                  "fault_domain": "ci-runner",
+                                  "key_recovery": "independent"},
+            },
+            {
+                "source_unavailable": True, "repository_accessible": True,
+                "key_retrievable": True, "snapshot_readable": True,
+            },
+        )
+        if (boundary.status != "BLOCKED" or boundary.restore_authorized
+                or boundary.off_host_proven
+                or "disaster:repository_not_off_host" not in boundary.blockers
+                or "disaster:shared_or_unknown_fault_domain" not in boundary.blockers):
+            raise RuntimeError("synthetic local-only backup promoted to off-host readiness")
         print("F2-PG PASS PostgreSQL pg_dump + 3 files restored to separate two-service group",
               flush=True)
-        print("F2-PG PASS incomplete/damaged group rejected, original unchanged", flush=True)
+        print("F2-PG PASS incomplete/damaged checkpoint refused before source loss", flush=True)
         print("H20 PASS encrypted PostgreSQL Restic exact snapshot, repository check, "
               "isolated two-service restore and protected known-good", flush=True)
         print("H21 PASS invalid Restic password refused and snapshot preserved", flush=True)
+        print("H22 PASS source node/files lost, restored from retained Restic, "
+              "local repo remains off-host BLOCKED", flush=True)
+        print("H23 PASS missing key and unavailable repository refused safely; "
+              "tested checkpoint still recoverable", flush=True)
     except Exception as error:
         fatal = error
     finally:
