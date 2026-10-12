@@ -1,0 +1,12 @@
+# Optional project-managed release policy example.
+# Names and paths are synthetic. This does not authorize any deployment.
+schema_version: "1"
+services:
+  local-editor:
+    policy: MANUAL
+    ownership: application_project
+    release_management:
+      strategy: project_managed
+      release_authority: application_project
+      version_monitoring: false
+      automatic_updates: false
