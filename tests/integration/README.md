@@ -41,6 +41,8 @@ The CI harness also installs the distribution-packaged Restic CLI **only** on it
 - **H17:** restore **that exact ID**, never `latest`, into a new tree; verify the checkpoint manifest and the SQLite/attachment links; boot a *separate* disposable Compose app from that restored data and demand a passing health check.
 - **H18:** verify that a deliberately incorrect test password cannot list snapshots; recheck that the known-good snapshot is still readable. No `forget`, `prune`, `unlock` or `repair` is exposed by the fixture Restic wrapper.
 
+- **H19:** bind the exact Restic snapshot to a provider-neutral recovery-set fingerprint and separately earned restore/smoke proof; verify that retention planning preserves the known-good checkpoint. This is only a read-only contract test, with no deletion API.
+
 The test-only provider source is `restic_fixture.py`. Its allowed command surface is explicitly restricted, it never inherits Restic/cloud credentials and it redacts command failures. Offline refusal tests live in `tests/test_restic_fixture_contract.py`. The provider comparison/decision is [ADR-001](../../docs/ADR-001-DISPOSABLE-RESTIC.md).
 
 An encrypted Restic snapshot and repository `check` are **not** proof that a live database can be recovered without application-coherent capture; only the separate restore + application smoke earns synthetic `RESTORE_TESTED` evidence.
