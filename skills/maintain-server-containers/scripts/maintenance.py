@@ -366,7 +366,6 @@ def main(argv: list[str] | None = None) -> int:
                 for warning in warnings:
                     print(f"NOTE: {warning}")
             return 2 if errors else 0
-        from release_management import public_release_management
         services, errors = normalize(data)
         if args.live and args.runtime_json:
             raise PolicyError("--live and --runtime-json cannot be combined")
