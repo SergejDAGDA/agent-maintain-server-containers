@@ -1,0 +1,39 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "maintain-server-containers",
+  "version": "0.1.0",
+  "description": "Portable, policy-driven Docker Compose maintenance skill with read-only audit and planning, state preservation and controlled update runbooks.",
+  "author": {
+    "name": "Sergej DAGDA",
+    "url": "https://github.com/SergejDAGDA"
+  },
+  "homepage": "https://github.com/SergejDAGDA/agent-maintain-server-containers",
+  "repository": "https://github.com/SergejDAGDA/agent-maintain-server-containers",
+  "license": "MIT",
+  "keywords": [
+    "docker",
+    "docker-compose",
+    "container-maintenance",
+    "backup",
+    "agent-skills",
+    "codex",
+    "claude-code"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Maintain Server Containers",
+    "shortDescription": "Audit, plan and safely maintain Docker Compose services",
+    "developerName": "Sergej DAGDA",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Audit my Compose server without changing its state.",
+      "Plan available container updates and tell me which are safe.",
+      "Update eligible AUTO_SAFE services under the current project's maintenance policy while preserving data."
+    ]
+  }
+}

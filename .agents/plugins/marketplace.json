@@ -1,0 +1,21 @@
+{
+  "name": "agent-maintain-server-containers",
+  "interface": {
+    "displayName": "SergejDAGDA Maintain Server Containers"
+  },
+  "plugins": [
+    {
+      "name": "maintain-server-containers",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/SergejDAGDA/agent-maintain-server-containers.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+# Entirely synthetic representation of the richer project-native policy.
+schema: demo-maintenance/v1
+policy_revision: 1
+authority:
+  live_runtime: runtime_is_source_of_truth
+classes:
+  AUTO_SAFE: {mutation_allowed: true}
+  AUTO_GATED: {mutation_allowed: true}
+  MANUAL: {mutation_allowed: false}
+  PIN_ONLY: {mutation_allowed: true, application_content_upgrade_allowed: false}
+  NO_TOUCH: {mutation_allowed: false}
+safety_invariants:
+  no_proven_state_contract: no_update
+  image_rollback_is_not_state_rollback: true
+  external_or_unknown_ownership: never_automatic
+  security_release_gate_bypass: prohibited
+mutation_reporting:
+  dimensions:
+    - application_version_modified
+    - runtime_container_state_modified
+    - persistent_user_state_modified
+    - deployment_source_modified
+    - network_access_modified
+    - database_schema_modified
+version_policy:
+  AUTO_SAFE: {allowed: explicit_patch_range_only}
+backup_defaults:
+  required_for_runtime_mutation: true
+service_groups:
+  synthetic-web-stack:
+    services: [synthetic-web, synthetic-background]
+    component_aliases:
+      synthetic-background:
+        policy_service: synthetic-worker
+        compose_service: worker
+    update_as_group: true
+    manual_member_forces_group_manual: true
+smoke_profiles:
+  test-web:
+    generic: [container_running]
+    service_specific: [http_probe]
+services:
+  - name: synthetic-web
+    policy_class: AUTO_SAFE
+    ownership: sandbox
+    identity:
+      compose_project: synthetic
+      compose_services: [web]
+    deployment:
+      server_source: /synthetic/compose.yaml
+      source_reproducible: true
+    image:
+      repository: example.invalid/web
+      runtime_reference: example.invalid/web:1.0.0
+      immutable_identity: sha256:synthetic
+    upstream: {authoritative_release_source: example.invalid/releases}
+    version_policy: {allowed_automatic_range: 1.0.x, target_mode: patch_only}
+    state_contract:
+      completeness: complete
+      binds: []
+      named_volumes: []
+      databases: []
+      uploaded_user_files: none
+      account_state: none
+      secrets: []
+      instance_identity: synthetic-web
+      disposable_caches: []
+    backup: {required: true, recovery_mechanism: synthetic}
+    migration: {possible: false, rollback_class: safe_image_and_source}
+    topology: {ports: [], networks: [synthetic_net], mounts_invariant: true}
+    health: {docker_expectation: healthy}
+    smoke: {profile: test-web}
+    rollback: {previous_image: example.invalid/web:1.0.0}
+    dependencies: {update_group: synthetic-web-stack}
+    no_touch: {enabled: false}
+  - name: synthetic-worker
+    policy_class: MANUAL
+    ownership: external_admin
+    identity:
+      compose_project: synthetic
+      compose_services: [worker]
+    deployment: {source_reproducible: true}
+    image: {runtime_reference: example.invalid/worker:1}
+    upstream: {}
+    version_policy: {allowed_automatic_range: none}
+    state_contract:
+      completeness: partial
+      binds: []
+      named_volumes: []
+      databases: unknown
+      uploaded_user_files: unknown
+      account_state: unknown
+      secrets: []
+      instance_identity: synthetic-worker
+      disposable_caches: unknown
+    backup: {required: true}
+    migration: {possible: unknown}
+    topology: {}
+    health: {}
+    smoke: {}
+    rollback: {}
+    dependencies: {update_group: synthetic-web-stack}
+    no_touch: {enabled: false}
+  - name: synthetic-protected
+    policy_class: NO_TOUCH
+    ownership: application_project
+    identity:
+      compose_project: synthetic-protected
+      compose_services: [db]
+    deployment: {}
+    image: {}
+    upstream: {}
+    version_policy: {}
+    state_contract:
+      completeness: not_required_for_no_touch
+      binds: managed_by_other_workstream
+      named_volumes: managed_by_other_workstream
+      databases: unknown
+      uploaded_user_files: unknown
+      account_state: unknown
+      secrets: none_recorded
+      instance_identity: synthetic-protected
+      disposable_caches: unknown
+    backup: {}
+    migration: {}
+    topology: {}
+    health: {}
+    smoke: {}
+    rollback: {}
+    dependencies: {}
+    no_touch: {enabled: true}

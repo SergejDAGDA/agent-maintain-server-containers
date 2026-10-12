@@ -1,0 +1,95 @@
+# Portable project policy v1
+
+The **public skill** is universal. Each project owns its own `maintenance/services.yaml` (or JSON) and adapters. This v1 schema is deliberately small and the validation tool does not silently translate a project-specific policy.
+
+Top level: `schema_version: "1"` and `services` as a sequence or mapping keyed by name.
+
+Minimum declared update candidate:
+
+```yaml
+schema_version: "1"
+services:
+  - name: demo-web
+    policy: AUTO_SAFE
+    ownership: sandbox
+    deployment:
+      compose_file: ./compose.yaml
+      project: demo
+      service: web
+    image:
+      current: example.invalid/web:1.0.0
+    target:
+      image: example.invalid/web:1.0.1
+    state:
+      complete: true
+      binds: []
+      volumes: []
+      databases: []
+      user_files: []
+      secret_refs: []
+    backup:
+      required: false
+    rollback:
+      class: image_only
+    health:
+      container: healthy
+    smoke:
+      profile: http
+```
+
+`AUTO_GATED` must have `backup.required: true` plus a defined restore/migration runbook before an agent may act. Other rollback classes are `state_restore_required` and `unknown`. Neither is equivalent to a verified automated rollback.
+
+For `PIN_ONLY` the target image must be the same immutable image content, not simply a tag that looks similar. For `MANUAL` or `NO_TOUCH` a minimal record needs `name`, `policy` and `ownership`.
+
+`ownership` is one of `sandbox`, `application_project`, `external_admin` or `unknown`. `application_project` means the project has maintenance authority for the application. Deployment authority must still be confirmed from repo instructions. `external_admin` and `unknown` are blocked from automation.
+
+The bundled validator checks syntax, required fields and some logical contradictions. It does not access upstream release APIs, run data restores, execute smoke probes or run upgrades.
+
+### Runtime evidence
+
+`--live` performs Docker metadata reads and checks one uniquely matched Compose project/service. It does not prove equality of bind contents, target compatibility, or source/Compose render. `--runtime-json` exists for synthetic fixture testing, not as trusted proof of a live server. Never treat a `GATED` result as execution authorization.
+
+### Extending the schema
+
+Project policy may add provenance, release ranges, dependency groups, adapter references, structured backup gates and state-specific checks. The skill must inspect them and fail closed if behavior is unknown, not silently ignore a security-critical rule. Upstream and integration adapters should be explicit, tested and versioned.
+
+A project with a pre-existing differently shaped `services.yaml` must map it to the portable contract or provide a validated adapter. File naming alone does not establish compatibility.
+
+## Extended, namespaced project policies
+
+The CLI also accepts an extended family of policies identified by `schema: <project>-maintenance/v1` and `policy_revision: 1`. This is a generic structural adapter, not a service-specific driver. Typical extended entries use `policy_class`, `identity.compose_project`, `identity.compose_services`, `deployment.server_source`, `state_contract.completeness`, `backup`, `migration`, `smoke`, `rollback`, and `dependencies`. A top-level `service_groups` mapping may describe composite stacks and subcomponents.
+
+The adapter validates the presence of safety invariants and mutation-reporting dimensions. It leaves unknown migration gates unresolved. A group may refer to a subcomponent with a different policy logical name. Such aliases are reported for review, never invented or silently considered safe. `NO_TOUCH` records are excluded without Docker inspection. `MANUAL` records remain manual. A service with a declared `complete` contract is still **not** automatically ready for update: current upstream release, recovery evidence, precise target, topology, and smoke must be independently proved.
+
+The adapter is intentionally read-only. It does not translate the rich policy back into the simplified portable format or write to the original file. See `examples/native-policy.yaml` for synthetic data.
+
+
+### Explicit component aliases
+
+Extended policies may declare logical group member names that differ from their
+actual Docker Compose service identities. Declare each mismatch **in the
+consuming project's policy**, not in the portable skill:
+
+```yaml
+service_groups:
+  demo-stack:
+    services: [demo-web, demo-background]
+    component_aliases:
+      demo-background:
+        policy_service: demo-worker
+        compose_service: worker
+    update_as_group: true
+    manual_member_forces_group_manual: true
+```
+
+Here `demo-background` names a group component, `demo-worker` names its
+existing policy record, and `worker` must exactly match one of that record's
+`identity.compose_services` values. The record must declare
+`dependencies.update_group: demo-stack`. Normalization of hyphens, prefixes,
+container names or image tags is **never guessed**.
+
+For `update_as_group: true`, an unresolved, incorrect or conflicting alias
+makes structural validation **FAIL** rather than merely warning. A group
+containing a `MANUAL` or `NO_TOUCH` policy member remains blocked for
+automatic updates. Aliases do not grant new ownership or change the policies of
+the underlying service records.

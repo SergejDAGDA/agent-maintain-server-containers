@@ -1,0 +1,37 @@
+# Portable sample, not a configuration for any real server.
+schema_version: "1"
+services:
+  - name: demo-web
+    policy: AUTO_SAFE
+    ownership: sandbox
+    deployment:
+      compose_file: ./compose.yaml
+      project: demo
+      service: web
+    image:
+      current: example.invalid/demo-web:1.2.3
+    target:
+      image: example.invalid/demo-web:1.2.4
+    state:
+      complete: true
+      binds: []
+      volumes: []
+      databases: []
+      user_files: []
+      secret_refs: []
+    backup:
+      required: false
+    rollback:
+      class: image_only
+    health:
+      container: healthy
+    smoke:
+      profile: http
+  - name: external-manager
+    policy: MANUAL
+    ownership: external_admin
+    reason: Managed outside this project
+  - name: critical-database
+    policy: NO_TOUCH
+    ownership: application_project
+    reason: Requires separately approved migration
