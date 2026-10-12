@@ -41,7 +41,7 @@ python skills/maintain-server-containers/scripts/maintenance.py --policy mainten
 python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live status
 ```
 
-The helper runs only read-only Docker `ps` and `inspect` and does not change application state. It supports the portable v1 schema and a generic read-only adapter for namespaced `<project>-maintenance/v1` policies with richer project-owned state contracts and groups. Other existing policies may require an explicit adapter. A `GATED` or `CANDIDATE` classification never constitutes release, backup or rollback approval. If runtime/policy disagree, reconcile *before* update, not by blindly recreating containers.
+The helper runs only read-only Docker `ps` and `inspect` and does not change application state. It supports the portable v1 schema and a read-only validator for namespaced `<project>-maintenance/v1` policies with richer project-owned state contracts, migration/rollback gates and groups. A semantically incomplete `complete` contract is a validation error, not an approval. When `--live` is used for such a policy, only selected Docker metadata is retrieved and compared; metadata matching never proves source reproducibility, backup restoration or application smoke. Other existing policies may require an explicit adapter. A `GATED` or `CANDIDATE` classification never constitutes release, backup or rollback approval. If runtime/policy disagree, reconcile *before* update, not by blindly recreating containers.
 
 ## Update policy
 
@@ -105,5 +105,7 @@ For any unexecuted check, write `NOT VERIFIED` rather than `PASS`.
 ## Scope and portability
 
 Works with Docker Compose and project-defined adapters. Do not pretend the generic skill knows how to migrate a particular database, authenticate to an application, or infer the backup validity of an unknown bind mount. Prefer narrowly actionable issues over generic warnings. Avoid approval questions once a plan stays within a single explicit authorization. Stop only at genuine safety, authority or scope boundaries.
+
+See [deployment-record.md](references/deployment-record.md) for owning and reconciling operational records and optional project-memory synchronization.
 
 Read `references/maintenance-protocol.md` for the canonical operator workflow, `references/project-deployment.md` for application-owned release deployment, `references/repository-deployment.md` for first-time third-party application installation, and `references/policy-schema.md` for portable policy semantics.
