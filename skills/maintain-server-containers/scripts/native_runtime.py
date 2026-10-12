@@ -135,7 +135,7 @@ def contract_differences(service: dict, snapshots: list[dict]) -> list[str]:
         if invariant == "read_only_root" and any(s.get("readonly_root") is not True for s in snapshots):
             issues.append("readonly root filesystem policy mismatch")
         elif invariant == "no_new_privileges" and any(
-            not any("no-new-privileges" in str(x).lower() for x in (s.get("security_opt") or []))
+            not any(str(x).lower() in ("no-new-privileges", "no-new-privileges:true", "no-new-privileges= true", "no-new-privileges=true") for x in (s.get("security_opt") or []))
             for s in snapshots
         ):
             issues.append("no-new-privileges policy mismatch")
