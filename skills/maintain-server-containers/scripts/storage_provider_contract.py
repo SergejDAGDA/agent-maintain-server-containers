@@ -147,6 +147,9 @@ def assess_storage_evidence(
     descriptor = validate_storage_provider(provider)
     if not descriptor.valid:
         errors.append("storage:invalid_provider")
+    if (not isinstance(checkpoint, dict) or not isinstance(provider, dict)
+            or checkpoint.get("provider") != provider.get("engine")):
+        errors.append("storage:checkpoint_provider_mismatch")
     if (not _digest(expected_provider_fingerprint)
             or expected_provider_fingerprint != descriptor.fingerprint):
         errors.append("storage:provider_pin_mismatch")
