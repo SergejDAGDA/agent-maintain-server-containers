@@ -72,6 +72,31 @@ class ThirdReviewTest(unittest.TestCase):
             self.assertTrue(all(s["runtime"]["status"] == "NOT_CHECKED"
                                 for s in data["services"]))
 
+    def test_malformed_optional_release_management_never_crashes(self):
+        for field in ("strategy", "release_authority"):
+            for value in (["wrong"], {"unexpected": True}, 3, False):
+                with self.subTest(field=field, value=value):
+                    native = self.native()
+                    native["services"][0]["release_management"] = {
+                        "strategy": "project_managed",
+                        "release_authority": "application_project",
+                        "version_monitoring": False,
+                        "automatic_updates": False,
+                    }
+                    native["services"][0]["release_management"][field] = value
+                    _, errors, _ = native_policy.structure(native)
+                    self.assertTrue(any("release_management" in e for e in errors), errors)
+                    portable = self.portable()
+                    portable["services"][0]["release_management"] = {
+                        "strategy": "project_managed",
+                        "release_authority": "application_project",
+                        "version_monitoring": False,
+                        "automatic_updates": False,
+                    }
+                    portable["services"][0]["release_management"][field] = value
+                    _, errors = maintenance.normalize(portable)
+                    self.assertTrue(any("release_management" in e for e in errors), errors)
+
     def test_unknown_global_security_invariant_fails_structural_validation(self):
         for value in (True, False, "yes", {"enabled": True}):
             with self.subTest(value=value):
