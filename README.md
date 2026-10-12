@@ -98,6 +98,17 @@ Portable v1 services can be declared with `services` as either a YAML list or a 
 
 Read [policy-schema.md](skills/maintain-server-containers/references/policy-schema.md) before using the schema in production. A pre-existing project-specific `services.yaml` is **not automatically compatible** merely because it has the same filename.
 
+
+### Component names in dependency groups
+
+For composite stacks, logical component names may differ from Compose service
+names. Declare explicit `component_aliases` in the **project policy**, rather
+than letting the agent guess. See
+[policy-schema.md](skills/maintain-server-containers/references/policy-schema.md)
+and [synthetic extended fixture](examples/native-policy.yaml). An unresolved
+member in a required update-as-group stack is a validation error and blocks
+automatic maintenance.
+
 ## Policy levels
 
 | Class | Intended behavior |
