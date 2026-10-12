@@ -99,6 +99,10 @@ def validate_compose(project: str, assets: Path) -> None:
     if (db.get("volumes") or not isinstance(entries, list)
             or {x.split(":", 1)[0] for x in entries} != required_tmpfs):
         raise RuntimeError("REFUSED: PostgreSQL state is not strictly tmpfs")
+    worker_tmpfs = services["worker"].get("tmpfs", [])
+    if (not isinstance(worker_tmpfs, list)
+            or {x.split(":", 1)[0] for x in worker_tmpfs} != {"/var/lib/postgresql/data"}):
+        raise RuntimeError("REFUSED: worker may create anonymous PostgreSQL volume")
     mounts = services["worker"].get("volumes", [])
     if (len(mounts) != 1 or mounts[0].get("type") != "bind"
             or mounts[0].get("source") != str(assets)
