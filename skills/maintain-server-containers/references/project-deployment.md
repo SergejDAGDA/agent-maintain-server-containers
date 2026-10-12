@@ -47,6 +47,8 @@ A memory file stating "ready" cannot replace a build/CI acceptance record. A Git
 
 **E. Record only what happened:** Once runtime verification passes, write or update the deployment owner's existing authoritative deployment record with approved release identity, source revision, artifact/image digest, Compose source identity, actual runtime identities, timestamp, smoke checks and recovery references. Do not create a competing ledger when the project already has one.
 
+Read [deployment-record.md](deployment-record.md) for the optional adapter interface, durable operational identity and a precise revalidation-based recovery path for `DEPLOYED_RECORD_SYNC_PENDING`. Its record example is not a required new file or replacement for the project's existing schema.
+
 ## Project memory and documentation synchronization
 
 Successful deployment is a meaningful **Checkpoint**, not a new active Handoff:
