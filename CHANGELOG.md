@@ -12,6 +12,8 @@
   Checkpoint and targeted `project-documentation` update without new handoffs.
 - Enforce existing MANUAL, NO_TOUCH and external ownership restrictions.
 - Synthetic policy fixture and regression tests.
+- Add strict named-service field validation, dependency-group references and exact membership, Compose project identity validation, and sanitized allowlisted `release_management` report fields; reject unknown release extensions rather than echo their values.
+- Treat non-text native Docker metadata as unverified instead of throwing; add synthetic fourth-review regressions.
 - Harden invalid external inputs: malformed group identities/dependencies and Docker inspect metadata now return explicit errors/unverified rather than crashing; unknown top-level global safety invariants fail validation.
 - Prevent malformed optional release-management values from triggering type errors in either policy schema.
 - Fix fail-closed regressions: forbid empty collections as backup/rollback/smoke identity evidence, while allowing explicitly empty state inventories; reject unsupported security invariants before live checks; stop all portable-policy live inspection if validation fails.
