@@ -253,20 +253,16 @@ def _runtime(service: dict) -> dict:
             ids = [s for s in p.stdout.splitlines() if s]
             if len(ids) != 1:
                 return {"status": "UNVERIFIED", "reason": "Compose service not unique"}
+            from native_runtime import INSPECT_TEMPLATE, parse_targeted_inspect
             q = subprocess.run(
-                ["docker", "inspect", "--format", "{{json .}}", ids[0]],
+                ["docker", "inspect", "--format", INSPECT_TEMPLATE, ids[0]],
                 capture_output=True, text=True, timeout=15, check=False
             )
             if q.returncode:
                 return {"status": "UNVERIFIED", "reason": "Docker inspect unavailable"}
-            obj = json.loads(q.stdout)
-            results.append({
-                "service": name,
-                "image_id": obj.get("Image"),
-                "configured_image": obj.get("Config", {}).get("Image"),
-                "running": obj.get("State", {}).get("Running"),
-                "health": obj.get("State", {}).get("Health", {}).get("Status", "no_healthcheck")
-            })
+            snap = parse_targeted_inspect(q.stdout)
+            snap["service"] = name
+            results.append(snap)
         except (OSError, subprocess.TimeoutExpired, ValueError, TypeError):
             return {"status": "UNVERIFIED", "reason": "Docker inspection unavailable"}
     return {"status": "OBSERVED", "services": results}
@@ -329,8 +325,18 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                 observed = _runtime(service)
                 if observed.get("status") != "OBSERVED":
                     issues.append("live runtime identity unverified")
-                elif not all(x.get("running") for x in observed["services"]):
-                    issues.append("one or more Compose services not running")
+                else:
+                    from native_runtime import contract_differences
+                    drifts = contract_differences(service, observed["services"])
+                    observed["contract_status"] = (
+                        "DRIFT" if drifts else "METADATA_MATCH_ONLY"
+                    )
+                    observed["contract_differences"] = drifts
+                    if drifts:
+                        issues.append("runtime policy metadata drift detected")
+                    # Even when metadata matches, Compose render, backup/restore
+                    # and application smoke remain independently unverified.
+                    issues.append("Compose source/backup/restore/smoke still require independent proof")
             else:
                 issues.append("live runtime not inspected")
             if cls == "PIN_ONLY":
@@ -348,6 +354,7 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                         "dependency group membership unresolved",
                         "one or more Compose services not running",
                         "live runtime identity unverified",
+                        "runtime policy metadata drift detected",
                     )
                 ) else "GATED"
         results.append({
