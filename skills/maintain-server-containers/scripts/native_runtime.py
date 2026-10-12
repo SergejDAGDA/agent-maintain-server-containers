@@ -59,7 +59,8 @@ def _private_binding(port: str) -> bool:
     host = port.split("->", 1)[0].rsplit(":", 1)[0].strip("[]")
     try:
         addr = ipaddress.ip_address(host)
-        return addr.is_private or addr.is_loopback
+        return (not addr.is_unspecified and not addr.is_multicast
+                and (addr.is_private or addr.is_loopback))
     except ValueError:
         return False
 
