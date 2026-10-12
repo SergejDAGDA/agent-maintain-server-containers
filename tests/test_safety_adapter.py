@@ -124,12 +124,39 @@ class SafetyAdapterTest(unittest.TestCase):
         self.assertTrue(validate_adapter_service(base, {"name": "app"}, {}, "plan"))
         adapter = TrustedSafetyAdapter(ID, "1.0.0", DIGEST, frozenset({EXTRA}),
                                        lambda _: {EXTRA: "PASS"},
-                                       lambda svc, ev, phase: {"state_boundary": "UNRESOLVED"})
+                                       lambda svc, ev, phase: {EXTRA: "UNRESOLVED"})
         self.assertTrue(validate_adapter_service(adapter, {"name": "app"}, {}, "pre_mutation"))
         adapter_ok = TrustedSafetyAdapter(ID, "1.0.0", DIGEST, frozenset({EXTRA}),
                                           lambda _: {EXTRA: "PASS"},
-                                          lambda svc, ev, phase: {"state_boundary": "PASS"})
+                                          lambda svc, ev, phase: {EXTRA: "PASS"})
         self.assertEqual(validate_adapter_service(adapter_ok, {"name": "app"}, {}, "pre_mutation"), [])
+
+    def test_service_checks_require_exact_claim_coverage(self):
+        claims = frozenset({EXTRA, "second_rule"})
+        responses = (
+            {EXTRA: "PASS"},  # omitted claimed rule
+            {"second_rule": "PASS"},  # omitted other claimed rule
+            {EXTRA: "PASS", "second_rule": "PASS", "extra_rule": "PASS"},
+            {"unrelated": "PASS"},  # pass without claims cannot bypass
+        )
+        for results in responses:
+            with self.subTest(results=results):
+                adapter = TrustedSafetyAdapter(
+                    ID, "1.0.0", DIGEST, claims,
+                    lambda _: {EXTRA: "PASS", "second_rule": "PASS"},
+                    lambda svc, ev, phase, r=results: r,
+                )
+                issues = validate_adapter_service(adapter, {"name": "app"}, {}, "pre_mutation")
+                self.assertTrue(any("claim coverage mismatch" in x for x in issues), issues)
+
+    def test_service_checks_accept_all_claimed_results_only(self):
+        claims = frozenset({EXTRA, "second_rule"})
+        adapter = TrustedSafetyAdapter(
+            ID, "1.0.0", DIGEST, claims,
+            lambda _: {EXTRA: "PASS", "second_rule": "PASS"},
+            lambda svc, ev, phase: {EXTRA: "PASS", "second_rule": "PASS"},
+        )
+        self.assertEqual(validate_adapter_service(adapter, {"name": "app"}, {}, "pre_mutation"), [])
 
     def test_explicit_null_group_and_manual_null_compose_are_allowed(self):
         p = maintenance.load_policy(ROOT / "examples/native-policy.yaml")
