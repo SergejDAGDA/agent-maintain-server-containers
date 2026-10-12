@@ -111,6 +111,8 @@ def validate_rendered_compose(project: str, state: Path, env: dict) -> None:
         "unprivileged_user": service.get("user") == "65534:65534",
         "no_privilege": not service.get("privileged", False),
         "capabilities_dropped": set(service.get("cap_drop", [])) == {"ALL"},
+        "no_new_privileges": "no-new-privileges:true" in service.get("security_opt", []),
+        "resource_limits": bool(service.get("pids_limit")) and bool(service.get("mem_limit")),
         "fixture_owner_label": service.get("labels", {}).get(LABEL) == "true",
         "exact_bind_paths": targets == approved and len(volumes) == 2,
         # Compose may omit an explicit create_host_path: false when rendering
