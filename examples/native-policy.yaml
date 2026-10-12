@@ -7,7 +7,7 @@ classes:
   AUTO_SAFE: {mutation_allowed: true}
   AUTO_GATED: {mutation_allowed: true}
   MANUAL: {mutation_allowed: false}
-  PIN_ONLY: {mutation_allowed: true}
+  PIN_ONLY: {mutation_allowed: true, application_content_upgrade_allowed: false}
   NO_TOUCH: {mutation_allowed: false}
 safety_invariants:
   no_proven_state_contract: no_update
