@@ -272,7 +272,7 @@ def main(argv: list[str] | None = None) -> int:
                 result = {
                     "operation": args.operation,
                     "read_only": True,
-                    "schema": "sandbox-server-maintenance/v1",
+                    "schema": data["schema"],
                     "policy_valid": not errors,
                     "errors": errors,
                     "warnings": warnings,
