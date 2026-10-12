@@ -264,3 +264,51 @@ remain the responsibility of an independently reviewed caller.
 Tickets are only replay-protected in one process and are not a durable
 distributed anti-replay store. Every result remains non-authorizing even
 when it says `CANDIDATE_ONLY`. The shipped v0.2.0 skill and CLI are unchanged.
+
+## Independently pinned signed witness evidence and durable replay (H26)
+
+`witness_attestation_contract.py` experimentally separates **cryptographic
+authenticity** from backup and disaster recovery readiness. A
+`TrustedWitness` registers a raw Ed25519 verification public key, key ID
+and declared fault domain through reviewed code, never through a
+source-controlled attestation document. A canonical
+`independent-witness-attestation/v1` signed statement binds the witness,
+key and domain, exact provider/recovery-set fingerprints, immutable Restic
+snapshot ID, Compose digest, repository identity, random nonce, and bounded
+issue/expiry times. Signature verification uses maintained OSS
+`cryptography`; it does not implement homegrown cryptography.
+
+A `DurableWitnessLedger` is constructed using an explicit SQLite connection
+opened by the trusted caller. It requires a filesystem-backed database and
+records verified attestation IDs with transactionally enforced uniqueness.
+Reopening that same database rejects reused evidence after a process restart.
+Append-only revocations may invalidate an attestation ID, a witness or its
+key, including evidence recorded **before** the revocation. The ledger cannot
+create a DB from an arbitrary policy path, issue signing keys, restore
+applications, mutate Docker or prune backups.
+
+A syntactically and cryptographically valid independent-domain declaration
+only produces `CRYPTO_VERIFIED_RECORDED`, with
+`restore_authorized=False`, `off_host_proven=False` and
+`eligible_for_prune=False`. Missing or stale signature, scope mismatch,
+same declared failure domain, invalid restore proof, revocation, duplicate
+receipt and unavailable journal block acceptance.
+
+H26 in the disposable CI PostgreSQL fixture generates an ephemeral
+synthetic Ed25519 key, signs a fully artificial witness claim after the
+actual isolated Restic restore smoke, commits it into a runner-owned SQLite
+file, reopens that file to test replay refusal, and revokes the key.
+**The synthetic signing key resides on the same CI runner and does not
+represent an independently operated witness**. H24/H25 continue to
+classify the actual local Restic repository as `BLOCKED` for off-host
+disaster recovery.
+
+Threat-model limitations: public-key pin provenance, independent witness
+operation and truthfulness, trusted clock, SQLite file ownership, durable
+replication, tamper resistance, backup of the journal, distributed replay
+protection, secure signing-key custody and revocation dissemination are not
+implemented. Ledger files can be rolled back or replaced by a privileged
+host adversary. A successful signature cannot establish physical domain
+independence or automatically permit any real-world change. Adding the
+`cryptography` verification dependency to source requirements is not
+a v0.2.0 release or installed-skill update.
