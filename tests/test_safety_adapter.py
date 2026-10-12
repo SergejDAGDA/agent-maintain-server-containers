@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills" / "maintain-server-containers" / "scripts"))
 import maintenance
 import native_policy
+import yaml
 from safety_adapter import (API, TrustedSafetyAdapter, validate_adapter_service)
 
 
@@ -184,6 +185,40 @@ class SafetyAdapterTest(unittest.TestCase):
                            return_value=SimpleNamespace(returncode=0, stdout=stdout)):
                     result = maintenance.docker_snapshot(portable["services"][0])
                     self.assertEqual(result["status"], "unverified")
+
+    def test_secret_bearing_service_invariant_never_leaks_via_cli(self):
+        sentinel = "SYNTHETIC_POLICY_SECRET_DO_NOT_ECHO"
+        for malformed in (sentinel, {sentinel: True}, [sentinel]):
+            for operation in ("validate", "audit", "status", "plan"):
+                for fmt in ("text", "json"):
+                    with self.subTest(malformed=malformed, operation=operation, fmt=fmt):
+                        policy = maintenance.load_policy(ROOT / "examples/native-policy.yaml")
+                        policy["services"][0]["topology"]["security_invariants"] = [malformed]
+                        with tempfile.TemporaryDirectory() as td:
+                            path = Path(td) / "invalid-policy.yaml"
+                            path.write_text(yaml.safe_dump(policy), encoding="utf-8")
+                            output = io.StringIO()
+                            error_output = io.StringIO()
+                            with patch("native_policy._runtime",
+                                       side_effect=AssertionError("Docker inspection forbidden")), \
+                                 contextlib.redirect_stdout(output), \
+                                 contextlib.redirect_stderr(error_output):
+                                rc = maintenance.main([
+                                    "--policy", str(path), "--format", fmt, "--live", operation
+                                ])
+                        self.assertEqual(rc, 2)
+                        self.assertNotIn(sentinel, output.getvalue())
+                        self.assertNotIn(sentinel, error_output.getvalue())
+                        self.assertIn("unsupported invariant (value withheld)", output.getvalue())
+                        if fmt == "json":
+                            report = json.loads(output.getvalue())
+                            self.assertFalse(report.get("policy_valid", report.get("valid", True)))
+                            self.assertEqual(len(report.get("services", [])), 3) if operation != "validate" else None
+                            if operation != "validate":
+                                self.assertTrue(all(
+                                    service["runtime"]["status"] == "NOT_CHECKED"
+                                    for service in report["services"]
+                                ))
 
     def test_secret_bearing_global_rule_identifier_not_reflected(self):
         sentinel = "SECRET_PRIVATE_GLOBAL_IDENTIFIER"
