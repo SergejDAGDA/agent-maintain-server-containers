@@ -99,9 +99,15 @@ def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[l
                 continue
             resolved.append(owner)
         elif exact_name:
-            resolved.append(exact_name)
+            if service_group(exact_name) != group_name:
+                problems.append(f"component {member}: policy owner belongs to another group")
+            else:
+                resolved.append(exact_name)
         elif len(exact_compose) == 1:
-            resolved.append(exact_compose[0])
+            if service_group(exact_compose[0]) != group_name:
+                problems.append(f"component {member}: Compose owner belongs to another group")
+            else:
+                resolved.append(exact_compose[0])
         elif len(exact_compose) > 1:
             problems.append(f"component {member}: ambiguous Compose service identity")
         else:
@@ -214,9 +220,20 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
                 warnings.append(f"{name}: incomplete state blocks automatic updates")
         ident = service.get("identity")
         if _obj(ident):
+            if cls in ("AUTO_SAFE", "AUTO_GATED", "PIN_ONLY") and not _safe_name(ident.get("compose_project")):
+                errors.append(f"{name}: identity.compose_project invalid")
+            elif "compose_project" in ident and not _safe_name(ident.get("compose_project")):
+                errors.append(f"{name}: identity.compose_project malformed")
             names = ident.get("compose_services")
             if not isinstance(names, list) or not names or not all(_safe_name(x) for x in names):
                 errors.append(f"{name}: identity.compose_services invalid")
+        deps = service.get("dependencies")
+        if _obj(deps) and "update_group" in deps:
+            group_name = deps["update_group"]
+            if not _safe_name(group_name):
+                errors.append(f"{name}: dependencies.update_group must be a valid non-empty group name")
+            elif not _obj(policy.get("service_groups")) or group_name not in policy["service_groups"]:
+                errors.append(f"{name}: dependencies.update_group refers to undefined group")
         if cls == "NO_TOUCH" and (_obj(service.get("no_touch")) and service["no_touch"].get("enabled") is not True):
             errors.append(f"{name}: NO_TOUCH must have no_touch.enabled=true")
         if owner in ("external_admin", "unknown") and cls in ("AUTO_SAFE", "AUTO_GATED", "PIN_ONLY"):
@@ -286,8 +303,12 @@ def _records_for_group(policy: dict, service: dict, services: list[dict]) -> tup
     dep = service.get("dependencies", {})
     group_name = dep.get("update_group") if _obj(dep) else None
     groups = policy.get("service_groups", {})
-    if not group_name or not _obj(groups) or group_name not in groups:
+    if group_name is None:
         return [], []
+    if not _safe_name(group_name):
+        return [], ["dependency group name invalid"]
+    if not _obj(groups) or group_name not in groups:
+        return [], ["declared dependency group undefined"]
     group = groups[group_name]
     if not _obj(group):
         return [], ["dependency group definition invalid"]
@@ -295,6 +316,7 @@ def _records_for_group(policy: dict, service: dict, services: list[dict]) -> tup
 
 
 def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> list[dict]:
+    from release_management import public_release_management
     results = []
     for service in services:
         name = service["name"]
@@ -379,6 +401,6 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
             "issues": issues,
             "runtime": observed,
             "target_candidate": service.get("version_policy", {}).get("target_candidate"),
-            "release_management": service.get("release_management"),
+            "release_management": public_release_management(service),
         })
     return results
