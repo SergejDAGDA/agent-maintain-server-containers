@@ -71,7 +71,13 @@ def safety_issues(service: dict) -> list[str]:
             val = state.get(key)
             # Explicit empty collections are valid descriptions of *absent*
             # state, but not evidence identities for recovery or rollback.
-            valid = (isinstance(val, list) and all(_defined(v) for v in val)) or _defined(val)
+            if key == "instance_identity":
+                # A single stable instance identity is not an empty collection.
+                valid = (isinstance(val, str) and _defined(val)) or (
+                    isinstance(val, dict) and _defined(val)
+                )
+            else:
+                valid = (isinstance(val, list) and all(_defined(v) for v in val)) or _defined(val)
             if not valid:
                 issues.append(f"state_contract.{key}: unresolved under complete state")
         dbs = state.get("databases")
