@@ -268,10 +268,31 @@ def main(argv: list[str] | None = None) -> int:
                     "valid": not errors,
                     "errors": errors,
                     "warnings": warnings,
-                    "note": "Structural compatibility is not authorization or proof of recovery."
+                    "note": "Structural and semantic policy checks are not backup/restore or runtime verification."
                 }
             else:
-                records = [] if errors else assess_native(data, services, live=args.live)
+                if errors:
+                    # Preserve a useful per-service inventory while guaranteeing that
+                    # an invalid policy never triggers even read-only live inspection.
+                    records = []
+                    for svc in services:
+                        service_name = svc["name"]
+                        cls = svc.get("policy_class")
+                        classification = ("EXCLUDED" if cls == "NO_TOUCH" else
+                                          "MANUAL_REVIEW" if cls == "MANUAL" else "BLOCKED")
+                        problems = [e for e in errors if e.startswith(service_name + ":")]
+                        if cls not in ("MANUAL", "NO_TOUCH"):
+                            problems.append("policy invalid: runtime inspection skipped; update forbidden")
+                        records.append({
+                            "name": service_name, "policy": cls,
+                            "ownership": svc.get("ownership"),
+                            "classification": classification, "issues": problems,
+                            "runtime": {"status": "NOT_CHECKED"},
+                            "target_candidate": None,
+                            "release_management": svc.get("release_management")
+                        })
+                else:
+                    records = assess_native(data, services, live=args.live)
                 result = {
                     "operation": args.operation,
                     "read_only": True,
