@@ -1,0 +1,35 @@
+# Fully synthetic, fixture-only Compose project. CI gives each run a unique
+# project name and immutable state directory under RUNNER_TEMP.
+services:
+  fixture:
+    image: python:3.12.12-slim@sha256:f3fa41d74a768c2fce8016b98c191ae8c1bacd8f1152870a3f9f87d350920b7c
+    command: ["python", "-B", "/fixture/app.py", "--serve"]
+    user: "65534:65534"
+    read_only: true
+    network_mode: "none"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 192m
+    cpus: 1.0
+    volumes:
+      - type: bind
+        source: ${MSC_STATE_DIR:?required test-only state directory}
+        target: /state
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MSC_FIXTURE_SCRIPT:?required fixture script}
+        target: /fixture/app.py
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "python", "-B", "/fixture/app.py", "--check"]
+      interval: 2s
+      timeout: 5s
+      retries: 8
+      start_period: 2s
+    labels:
+      org.openai.maintain-server-containers.test: "true"
