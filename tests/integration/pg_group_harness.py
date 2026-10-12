@@ -44,6 +44,10 @@ from storage_provider_contract import (  # noqa: E402
     assess_storage_evidence, validate_storage_provider,
 )
 from restic_fixture import ResticFixtureError  # noqa: E402
+from ci_pg_inspector import SyntheticPgReadOnlyInspector  # noqa: E402
+from trusted_inspector_registry import (  # noqa: E402
+    ReviewedInspector, ReviewedInspectorRegistry,
+)
 
 
 def _checksum(data: bytes) -> str:
@@ -547,6 +551,46 @@ def run() -> None:
                 or "storage:off_host_required" not in storage_gate.blockers
                 or "storage:shared_source_repository_domain" not in storage_gate.blockers):
             raise RuntimeError("local provider was promoted to off-host backup guarantee")
+        # H25: the only observer is a reviewed, directly instantiated,
+        # source-pinned read-only object, never a policy-imported callable.
+        ci_inspector = SyntheticPgReadOnlyInspector(
+            provider, snapshot_id=snapshot_id, package=checkpoint,
+            repository_id="ci-restic-repository",
+        )
+        registered_descriptor = dict(descriptor)
+        registered_descriptor["adapter_source_digest"] = (
+            "sha256:" + _sha_file(HERE / "ci_pg_inspector.py"))
+        reviewed_fingerprint = validate_storage_provider(registered_descriptor)
+        if not reviewed_fingerprint.valid or not reviewed_fingerprint.fingerprint:
+            raise RuntimeError("synthetic reviewed adapter fingerprint invalid")
+        binding = ReviewedInspector(
+            provider_id=registered_descriptor["provider_id"],
+            issuer_id="synthetic-ci-only",
+            provider_fingerprint=reviewed_fingerprint.fingerprint,
+            source_digest=registered_descriptor["adapter_source_digest"],
+            inspector=ci_inspector,
+        )
+        registry = ReviewedInspectorRegistry(HERE, (binding,))
+        ticket = registry.issue(registered_descriptor, group_recovery, proof,
+                                now_unix=clock)
+        registered_result = registry.observe(
+            ticket, registered_descriptor, group_recovery, proof,
+            now_unix=int(time.time()), require_off_host=True,
+        )
+        if (registered_result.status != "BLOCKED"
+                or registered_result.restore_authorized
+                or registered_result.off_host_proven
+                or "storage:off_host_required" not in registered_result.blockers):
+            raise RuntimeError("registered local observer falsely proves off-host readiness")
+        reused = registry.observe(
+            ticket, registered_descriptor, group_recovery, proof,
+            now_unix=int(time.time()),
+        )
+        if (reused.status != "BLOCKED"
+                or "registry:replayed_or_forged_ticket" not in reused.blockers):
+            raise RuntimeError("registered observation ticket reused")
+        print("H25 PASS reviewed source-pinned inspector and single-use scope ticket; "
+              "local Restic off-host BLOCKED", flush=True)
         print("H24 PASS exact snapshot and provider pin checked; "
               "local-only storage remains off-host BLOCKED", flush=True)
         print("F2-PG PASS PostgreSQL pg_dump + 3 files restored to separate two-service group",
