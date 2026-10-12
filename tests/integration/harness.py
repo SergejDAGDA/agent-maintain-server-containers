@@ -12,6 +12,7 @@ import json
 import os
 import secrets
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,7 @@ import time
 from pathlib import Path
 
 from fixture_app import verify_state
+from fixture_migration import SyntheticMigrationInterrupted, migrate_v2_then_interrupt, verify_v2
 from fixture_backup import capture_fixture, restore_fixture, seed_fixture, verify_checkpoint
 from restic_fixture import ResticFixture, TEST_MARKER
 
@@ -26,6 +28,7 @@ from restic_fixture import ResticFixture, TEST_MARKER
 SKILL_SCRIPTS = Path(__file__).resolve().parents[2] / "skills" / "maintain-server-containers" / "scripts"
 sys.path.insert(0, str(SKILL_SCRIPTS))
 from recovery_contract import validate_checkpoint, validate_recovery_set, plan_retention_dry_run  # noqa: E402
+from migration_contract import evaluate_image_only_rollback  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 COMPOSE = HERE / "fixture.compose.yaml"
@@ -254,10 +257,10 @@ def run_harness() -> None:
             raise RuntimeError("synthetic recovery-set declaration invalid")
         checkpoint_proof = {
             "id": snapshot_id, "recovery_fingerprint": evaluated.fingerprint,
-            "class": "PRE_UPGRADE", "provider": "restic",
+            "class": "PRE_MIGRATION", "provider": "restic",
             "capture_complete": True, "repository_checked": evidence.repository_checked,
             "isolated_restore_tested": evidence.restore_tested,
-            "application_smoke_passed": False, "holds": ["last_known_good"],
+            "application_smoke_passed": False, "holds": ["last_known_good", "pre_migration"],
         }
         if not evidence.repository_checked or not evidence.restore_tested:
             raise RuntimeError("Restic recovery evidence incomplete")
@@ -273,6 +276,45 @@ def run_harness() -> None:
         if retention.blockers or retention.permitted_candidates or len(retention.protected) != 1:
             raise RuntimeError("verified known-good checkpoint not protected")
         print("H19 PASS provider-neutral recovery proof and retention protection", flush=True)
+        # H06: force a synthetic v1 -> v2 DB migration and a crash *after*
+        # commit. The old v1 fixture cannot read v2 schema. No Docker image
+        # changes, downgrade commands or state restores run on this source.
+        try:
+            migrate_v2_then_interrupt(original)
+        except SyntheticMigrationInterrupted:
+            pass
+        else:
+            raise RuntimeError("synthetic post-commit upgrade interruption not observed")
+        migrated_schema = verify_v2(original, expected=seed)
+        try:
+            verify_state(original)
+        except sqlite3.OperationalError:
+            pass
+        else:
+            raise RuntimeError("old v1 application unexpectedly accepted migrated schema")
+        runtime = {
+            "compose_source_digest": contract["compose"]["source_digest"],
+            "images": dict(contract["images"]),
+            "schema_revision": migrated_schema,
+        }
+        rollback = evaluate_image_only_rollback(
+            recovery_set=contract, checkpoint=checkpoint_proof,
+            expected_fingerprint=evaluated.fingerprint,
+            expected_runtime=runtime, observed_runtime=dict(runtime),
+            rollback_images=contract["images"], migration_scope=["db"],
+            baseline_schema="v1", observed_schema=migrated_schema,
+            interrupted_after_commit=True,
+        )
+        if (rollback.status != "RECOVERY_REQUIRED" or rollback.image_only_allowed
+                or rollback.recovery_checkpoint_id != snapshot_id):
+            raise RuntimeError("synthetic migration rollback refusal gate failed")
+        # The PRE_MIGRATION proof and independently restored v1 state still
+        # survive the failed v2 source. No implicit recovery or deletion.
+        restic.check_snapshot(snapshot_id, staged_checkpoint=restic_source)
+        if verify_checkpoint(restic_source) != seed or verify_state(restic_restored) != seed:
+            raise RuntimeError("tested pre-migration recovery point did not survive")
+        print("H06 PASS incompatible migration blocks image-only rollback; "
+              "RECOVERY_REQUIRED with tested checkpoint preserved", flush=True)
         restic.reject_incorrect_password()
         restic.check_snapshot(snapshot_id, staged_checkpoint=restic_source)
         print("H16 PASS encrypted Restic snapshot and repository data check", flush=True)
