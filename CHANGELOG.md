@@ -6,6 +6,7 @@
 - Codex/Claude compatible packaging with a single canonical skill body.
 - English and Russian user documentation.
 - Versioned portable policy v1 and read-only validator, audit, status and plan CLI.
+- Read-only adapter for richer namespaced project maintenance v1 policies, including policy classes, composite Compose identities and dependency groups. The original project policy is never rewritten.
 - Agent-operated bounded maintenance and rollback runbooks.
 - Synthetic regression tests and GitHub Actions checks.
 - Explicit distinction between the read-only helper and an unimplemented deterministic update executor.
