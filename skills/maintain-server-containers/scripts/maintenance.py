@@ -13,6 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from release_management import public_release_management
 
 POLICIES = {"AUTO_SAFE", "AUTO_GATED", "MANUAL", "PIN_ONLY", "NO_TOUCH"}
 OWNERS = {"sandbox", "application_project", "external_admin", "unknown"}
@@ -136,7 +137,7 @@ def validate_service(service: dict) -> list[str]:
         service["image"].get("current"), str
     ):
         issues.append("current image identity missing")
-    if policy not in {"PIN_ONLY"}:
+    if policy != "PIN_ONLY":
         target = service.get("target", {})
         if not isinstance(target, dict) or not isinstance(target.get("image"), str):
             issues.append("explicit target image not specified")
@@ -283,7 +284,7 @@ def assessment(service: dict, runtime: dict | None) -> dict:
             "configured_image": r.get("configured_image"),
             "image_id": r.get("image_id")
         },
-        "release_management": service.get("release_management"),
+        "release_management": public_release_management(service),
         "proposed_target": (service.get("target", {}).get("image")
                             if isinstance(service.get("target"), dict) else None),
     }
