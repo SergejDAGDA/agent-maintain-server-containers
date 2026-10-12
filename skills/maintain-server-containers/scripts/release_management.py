@@ -21,9 +21,9 @@ def validate_release_management(service: dict, *, class_field: str) -> list[str]
         errors.append(f"{name}: release_management missing {', '.join(sorted(missing))}")
     strategy = cfg.get("strategy")
     authority = cfg.get("release_authority")
-    if strategy not in STRATEGIES:
+    if not isinstance(strategy, str) or strategy not in STRATEGIES:
         errors.append(f"{name}: unsupported release_management.strategy")
-    if authority not in AUTHORITIES:
+    if not isinstance(authority, str) or authority not in AUTHORITIES:
         errors.append(f"{name}: unsupported release_management.release_authority")
     if not isinstance(cfg.get("version_monitoring"), bool):
         errors.append(f"{name}: release_management.version_monitoring must be boolean")
@@ -35,7 +35,7 @@ def validate_release_management(service: dict, *, class_field: str) -> list[str]
             errors.append(f"{name}: project_managed disables unsolicited version monitoring")
         if cfg.get("automatic_updates") is not False:
             errors.append(f"{name}: project_managed cannot enter update-auto")
-        if cls not in {"MANUAL", "NO_TOUCH"}:
+        if not isinstance(cls, str) or cls not in {"MANUAL", "NO_TOUCH"}:
             errors.append(f"{name}: project_managed requires MANUAL or NO_TOUCH policy")
         if authority in ("external_admin", "upstream_project"):
             errors.append(f"{name}: project_managed release requires an application/deployment owner")
