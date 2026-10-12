@@ -28,7 +28,7 @@ def _defined(value: Any) -> bool:
 def safety_issues(service: dict) -> list[str]:
     """Return per-service blocking gaps without changing the original policy."""
     cls = service.get("policy_class")
-    if cls not in ACTION_CLASSES:
+    if not isinstance(cls, str) or cls not in ACTION_CLASSES:
         return []
     issues: list[str] = []
     def require(section: str, key: str, predicate, why: str) -> Any:
