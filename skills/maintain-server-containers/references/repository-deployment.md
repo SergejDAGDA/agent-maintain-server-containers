@@ -33,7 +33,7 @@ Default to private/LAN-only or loopback exposure when location-specific rules al
 
 - Choose the host's existing deployment-management convention. Commit project-owned, non-secret Compose files and lockable references to its deployment source; do not improvise a second source of truth. A container `docker run` copy alone is not an acceptable reproducible release.
 - Create data directories and named volumes scoped to the new application; **never reuse or replace an existing state source by guesswork**.
-- Supply ordinary non-sensitive defaults automatically. Where credentials are required, use the host's existing secret store or a protected external configuration file with restrictive access. Generate new secrets using cryptographically secure facilities when the install contract calls for initial new credentials; do not log, commit or emit the secret value. Ask for a missing third-party credential if no safe supplied source exists.
+- Supply ordinary non-sensitive defaults automatically. Where credentials are required, use the host's existing secret store or a protected external configuration file with restrictive access. For POSIX files, require owner-only read/write permissions (0600) and a validated owner; for other platforms, verify the equivalent ACL. Check effective ownership and access after creation without printing the contents. Generate new secrets using cryptographically secure facilities when the install contract calls for initial new credentials; do not log, commit or emit the secret value. Ask for a missing third-party credential if no safe supplied source exists.
 - Check all required environment keys, images, startup ordering, health and smoke probes, resource quotas, and architecture compatibility.
 - Do not install host packages, change host-level permissions, alter kernel parameters, or execute remote setup scripts unless they are explicitly reviewed and within user authorization. If impossible without expanding scope, stop with a precise blocker and minimal question.
 
@@ -46,6 +46,8 @@ For genuinely new isolated state, there is no pre-existing application user data
 Create and start only the new bounded Compose project. Never run `docker compose down -v`, global prunes, broad resource cleanup, unmanaged scripts, or recreation of unrelated services.
 
 Verify final effective Compose, image IDs/digests, stable container health, any required application-level smoke, port and network isolation, persistent mount identities, and the absence of unintended host exposures. If initial installation fails, remove only provably new disposable runtime resources within scope; do not destroy created user data or non-empty state. Record partial state and manual recovery needs.
+
+Read [deployment-record.md](deployment-record.md) to discover the correct operational record owner and existing schema, and to check project-local integration requirements (such as dashboard labels, network exposure and directory conventions). Never hardcode one host's service inventory or naming.
 
 ### 5. Adopt into maintenance
 
