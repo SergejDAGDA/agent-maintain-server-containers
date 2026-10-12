@@ -40,6 +40,65 @@ def _safe_name(value: Any) -> bool:
     return isinstance(value, str) and SAFE_NAME.fullmatch(value) is not None
 
 
+def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[list[dict], list[str]]:
+    """Resolve exact policy or Compose identities with explicitly declared aliases.
+
+    An alias always identifies both the policy record and its exact Compose
+    service. We never guess name normalization (hyphens, underscores, etc.).
+    """
+    problems: list[str] = []
+    members = group.get("services")
+    aliases = group.get("component_aliases", {})
+    if not isinstance(members, list) or not members or not all(_safe_name(x) for x in members):
+        return [], ["services must be a non-empty list of component names"]
+    if len(set(members)) != len(members):
+        problems.append("duplicate group member")
+    if not _obj(aliases):
+        return [], problems + ["component_aliases must be a mapping"]
+    by_name = {service["name"]: service for service in services}
+    resolved: list[dict] = []
+    for alias_key in aliases:
+        if alias_key not in members:
+            problems.append(f"alias {alias_key}: not listed in group services")
+    for member in members:
+        exact_name = by_name.get(member)
+        exact_compose = [s for s in services
+                         if member in (s.get("identity", {}).get("compose_services") or [])]
+        if member in aliases:
+            alias = aliases[member]
+            if exact_name or exact_compose:
+                problems.append(f"component {member}: unnecessary/conflicting alias")
+                continue
+            if not _obj(alias) or set(alias) != {"policy_service", "compose_service"}:
+                problems.append(f"component {member}: alias requires policy_service and compose_service")
+                continue
+            policy_name = alias.get("policy_service")
+            compose_name = alias.get("compose_service")
+            owner = by_name.get(policy_name) if _safe_name(policy_name) else None
+            if owner is None or not _safe_name(compose_name):
+                problems.append(f"component {member}: alias owner or Compose name invalid")
+                continue
+            owner_services = owner.get("identity", {}).get("compose_services") or []
+            if compose_name not in owner_services:
+                problems.append(f"component {member}: alias Compose service not in owning record")
+                continue
+            target_group = owner.get("dependencies", {}).get("update_group")
+            if target_group != group_name:
+                problems.append(f"component {member}: alias policy owner belongs to another group")
+                continue
+            resolved.append(owner)
+        elif exact_name:
+            resolved.append(exact_name)
+        elif len(exact_compose) == 1:
+            resolved.append(exact_compose[0])
+        elif len(exact_compose) > 1:
+            problems.append(f"component {member}: ambiguous Compose service identity")
+        else:
+            problems.append(f"component {member}: unresolved; declare an explicit component_aliases entry")
+    unique = {s["name"]: s for s in resolved}
+    return list(unique.values()), problems
+
+
 def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
     """Validate structural shape. Return service records, fatal errors and warnings.
 
@@ -155,18 +214,14 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             if not _safe_name(group_name) or not _obj(group):
                 errors.append("service group name/definition invalid")
                 continue
-            members = group.get("services")
-            if not isinstance(members, list) or not all(_safe_name(s) for s in members):
-                errors.append(f"group {group_name}: invalid services list")
-                continue
-            # Some group members are subordinate Compose services, not policy records.
-            # Record that fact as a review warning, not a broken-reference assertion.
-            for member in members:
-                if member not in seen and not any(
-                    member in (s.get("identity", {}).get("compose_services") or [])
-                    for s in services
-                ):
-                    warnings.append(f"group {group_name}: component {member} requires alias resolution")
+            _, problems = resolve_group(group_name, group, services)
+            for problem in problems:
+                message = f"group {group_name}: {problem}"
+                # An update-as-group declaration is an enforceable safety boundary.
+                if group.get("update_as_group") is True:
+                    errors.append(message)
+                else:
+                    warnings.append(message)
     return services, errors, warnings
 
 
@@ -212,14 +267,16 @@ def _runtime(service: dict) -> dict:
     return {"status": "OBSERVED", "services": results}
 
 
-def _records_for_group(policy: dict, service: dict, services: list[dict]) -> list[dict]:
+def _records_for_group(policy: dict, service: dict, services: list[dict]) -> tuple[list[dict], list[str]]:
     dep = service.get("dependencies", {})
-    group = dep.get("update_group") if _obj(dep) else None
-    if not group or not _obj(policy.get("service_groups", {}).get(group)):
-        return []
-    members = set(policy["service_groups"][group].get("services", []))
-    return [s for s in services if s["name"] in members or
-            members.intersection(s.get("identity", {}).get("compose_services", []))]
+    group_name = dep.get("update_group") if _obj(dep) else None
+    groups = policy.get("service_groups", {})
+    if not group_name or not _obj(groups) or group_name not in groups:
+        return [], []
+    group = groups[group_name]
+    if not _obj(group):
+        return [], ["dependency group definition invalid"]
+    return resolve_group(group_name, group, services)
 
 
 def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> list[dict]:
@@ -245,7 +302,9 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                 issues.append("deployment not proven reproducible")
             if _obj(service.get("backup")) and not service["backup"].get("required", False):
                 issues.append("backup requirement missing")
-            group = _records_for_group(policy, service, services)
+            group, group_errors = _records_for_group(policy, service, services)
+            if group_errors:
+                issues.append("dependency group membership unresolved")
             if any(s.get("policy_class") in ("MANUAL", "NO_TOUCH") for s in group):
                 issues.append("dependency group includes MANUAL/NO_TOUCH member")
             if cls == "PIN_ONLY":
@@ -276,6 +335,7 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                         "deployment not proven reproducible",
                         "backup requirement missing",
                         "dependency group includes MANUAL/NO_TOUCH member",
+                        "dependency group membership unresolved",
                         "one or more Compose services not running",
                         "live runtime identity unverified",
                     )
