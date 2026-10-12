@@ -12,6 +12,8 @@
   Checkpoint and targeted `project-documentation` update without new handoffs.
 - Enforce existing MANUAL, NO_TOUCH and external ownership restrictions.
 - Synthetic policy fixture and regression tests.
+- Enforce per-service extended-policy safety semantics (state, migration, rollback, backup, topology and health), and compare only selected read-only Docker metadata. Distinguish metadata parity from proof of a safe deployment.
+- Define a portable deployment record discovery/reconciliation contract and local project integration checklist.
 - This is an agent workflow, **not a bundled Docker mutation executor**.
 - Add bounded `deploy-repository` agent workflow for first-time installation of external Git repositories, including trust, privileges, network exposure, persistent state, secrets, dependency validation and policy adoption.
 - Clarify that core deployment and operational records are standalone; `maintain-project-memory` and `project-documentation` integrations are optional, never required.
