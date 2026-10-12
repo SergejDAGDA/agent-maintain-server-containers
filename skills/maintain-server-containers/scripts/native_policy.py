@@ -41,12 +41,14 @@ def _safe_name(value: Any) -> bool:
 
 
 def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[list[dict], list[str]]:
-    """Resolve exact policy or Compose identities with explicitly declared aliases.
+    """Resolve explicit policy/Compose identities, never from guessed aliases.
 
-    An alias always identifies both the policy record and its exact Compose
-    service. We never guess name normalization (hyphens, underscores, etc.).
+    A structurally invalid service must remain reportable as a service record,
+    but malformed identity/dependency values cannot participate in resolution.
     """
     problems: list[str] = []
+    if not _obj(group):
+        return [], ["group definition must be a mapping"]
     members = group.get("services")
     aliases = group.get("component_aliases", {})
     if not isinstance(members, list) or not members or not all(_safe_name(x) for x in members):
@@ -55,15 +57,26 @@ def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[l
         problems.append("duplicate group member")
     if not _obj(aliases):
         return [], problems + ["component_aliases must be a mapping"]
-    by_name = {service["name"]: service for service in services}
+    by_name = {service["name"]: service for service in services
+               if _obj(service) and _safe_name(service.get("name"))}
+
+    def service_identity(item: dict) -> list[str]:
+        identity = item.get("identity")
+        names = identity.get("compose_services") if _obj(identity) else None
+        return names if isinstance(names, list) and all(_safe_name(n) for n in names) else []
+
+    def service_group(item: dict) -> str | None:
+        deps = item.get("dependencies")
+        return deps.get("update_group") if _obj(deps) else None
+
     resolved: list[dict] = []
     for alias_key in aliases:
         if alias_key not in members:
             problems.append(f"alias {alias_key}: not listed in group services")
     for member in members:
         exact_name = by_name.get(member)
-        exact_compose = [s for s in services
-                         if member in (s.get("identity", {}).get("compose_services") or [])]
+        exact_compose = [item for item in by_name.values()
+                         if member in service_identity(item)]
         if member in aliases:
             alias = aliases[member]
             if exact_name or exact_compose:
@@ -78,12 +91,10 @@ def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[l
             if owner is None or not _safe_name(compose_name):
                 problems.append(f"component {member}: alias owner or Compose name invalid")
                 continue
-            owner_services = owner.get("identity", {}).get("compose_services") or []
-            if compose_name not in owner_services:
+            if compose_name not in service_identity(owner):
                 problems.append(f"component {member}: alias Compose service not in owning record")
                 continue
-            target_group = owner.get("dependencies", {}).get("update_group")
-            if target_group != group_name:
+            if service_group(owner) != group_name:
                 problems.append(f"component {member}: alias policy owner belongs to another group")
                 continue
             resolved.append(owner)
@@ -95,8 +106,7 @@ def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[l
             problems.append(f"component {member}: ambiguous Compose service identity")
         else:
             problems.append(f"component {member}: unresolved; declare an explicit component_aliases entry")
-    unique = {s["name"]: s for s in resolved}
-    return list(unique.values()), problems
+    return list({item["name"]: item for item in resolved}.values()), problems
 
 
 def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
@@ -138,8 +148,12 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             "external_or_unknown_ownership": "never_automatic",
             "security_release_gate_bypass": "prohibited",
         }
+        for key in invariants.keys() - required.keys():
+            # Never interpret unknown global safety rules as permissive or
+            # silently skip their intended meaning.
+            errors.append(f"unsupported global safety invariant: {key}")
         for key, expected in required.items():
-            if invariants.get(key) != expected:
+            if invariants.get(key) != expected or type(invariants.get(key)) is not type(expected):
                 errors.append(f"required safety invariant missing or changed: {key}")
     report = policy.get("mutation_reporting", {})
     if _obj(report):
