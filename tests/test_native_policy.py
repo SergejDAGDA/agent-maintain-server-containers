@@ -1,5 +1,8 @@
 """Synthetic tests for extended project-maintenance policies."""
 import importlib.util
+import contextlib
+import io
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -129,6 +132,14 @@ class ExtendedPolicyTest(unittest.TestCase):
         data["services"][0]["ownership"] = "external_admin"
         _, errors, _ = native_policy.structure(data)
         self.assertTrue(any("external/unknown" in x for x in errors))
+
+    def test_cli_reports_the_actual_policy_namespace(self):
+        capture = io.StringIO()
+        with contextlib.redirect_stdout(capture):
+            code = maintenance.main(
+                ["--policy", str(self.path), "--format", "json", "plan"])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(capture.getvalue())["schema"], "demo-maintenance/v1")
 
     def test_native_cli_validate_and_plan(self):
         self.assertEqual(maintenance.main(
