@@ -129,7 +129,8 @@ def safety_issues(service: dict) -> list[str]:
                 if (not isinstance(invariant, str)
                         or invariant not in SECURITY_INVARIANTS
                         and USER_INVARIANT.fullmatch(invariant) is None):
-                    issues.append(f"topology.security_invariants: unsupported invariant {invariant!r}")
+                    # Never echo untrusted invariant values (which may contain secrets).
+                    issues.append("topology.security_invariants: unsupported invariant (value withheld)")
     require("topology", "container_identity", _defined, "container identity missing")
     require("health", "docker_expectation",
             lambda v: v in ("healthy", "no_healthcheck"), "must be healthy or no_healthcheck")
