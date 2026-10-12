@@ -13,12 +13,16 @@ import json
 import os
 import re
 import secrets
+import sqlite3
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from harness import _run, containers, refuse_unless_ephemeral
 from pg_restic_fixture import PgResticFixture
@@ -44,6 +48,10 @@ from storage_provider_contract import (  # noqa: E402
     assess_storage_evidence, validate_storage_provider,
 )
 from restic_fixture import ResticFixtureError  # noqa: E402
+from witness_attestation_contract import (  # noqa: E402
+    CLAIM, SCHEMA, DurableWitnessLedger, TrustedWitness, WitnessTrustStore,
+    canonical_statement, verify_and_record,
+)
 from ci_pg_inspector import SyntheticPgReadOnlyInspector  # noqa: E402
 from trusted_inspector_registry import (  # noqa: E402
     ReviewedInspector, ReviewedInspectorRegistry,
@@ -589,6 +597,66 @@ def run() -> None:
         if (reused.status != "BLOCKED"
                 or "registry:replayed_or_forged_ticket" not in reused.blockers):
             raise RuntimeError("registered observation ticket reused")
+        # H26: synthetic Ed25519 signing is done in this ephemeral runner.
+        # There is NO independently operated witness or real off-host backend.
+        # The signed statement must still be scoped to the exact actual snapshot.
+        signing_key = Ed25519PrivateKey.generate()
+        public_key = signing_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        signed_witness = {
+            "schema": SCHEMA,
+            "witness_id": "synthetic-ci-witness",
+            "key_id": "ci-ephemeral-key",
+            "witness_fault_domain": "ci-simulated-separate-domain",
+            "nonce": secrets.token_hex(32),
+            "provider_fingerprint": reviewed_fingerprint.fingerprint,
+            "recovery_fingerprint": declaration.fingerprint,
+            "snapshot_id": snapshot_id,
+            "compose_source_digest": group_recovery["compose"]["source_digest"],
+            "repository_id": registered_descriptor["repository_id"],
+            "issued_at_unix": int(time.time()),
+            "expires_at_unix": int(time.time()) + 300,
+            "claim": CLAIM,
+        }
+        trust = WitnessTrustStore((TrustedWitness(
+            witness_id="synthetic-ci-witness", key_id="ci-ephemeral-key",
+            public_key=public_key, fault_domain="ci-simulated-separate-domain",
+        ),))
+        ledger_path = sandbox / "synthetic-witness-replay.sqlite"
+        envelope = {
+            "statement": signed_witness,
+            "signature": signing_key.sign(canonical_statement(signed_witness)).hex(),
+        }
+        # The only durable ledger belongs to this fresh CI sandbox.
+        ledger_connection = sqlite3.connect(ledger_path, timeout=5)
+        try:
+            ledger = DurableWitnessLedger(ledger_connection)
+            signed = verify_and_record(
+                envelope, trust, ledger, group_recovery, proof, registered_descriptor,
+                now_unix=int(time.time()),
+            )
+            if (signed.status != "CRYPTO_VERIFIED_RECORDED"
+                    or not signed.attestation_id or signed.restore_authorized
+                    or signed.off_host_proven):
+                raise RuntimeError("synthetic signature contract cannot be recorded safely")
+            ledger_connection.close()
+            ledger_connection = sqlite3.connect(ledger_path, timeout=5)
+            restarted = DurableWitnessLedger(ledger_connection)
+            duplicate = verify_and_record(
+                envelope, trust, restarted, group_recovery, proof, registered_descriptor,
+                now_unix=int(time.time()),
+            )
+            if (duplicate.status != "BLOCKED" or "witness:replayed" not in duplicate.blockers):
+                raise RuntimeError("durable SQLite replay guard failed on reconnect")
+            if not restarted.revoke("key", "synthetic-ci-witness:ci-ephemeral-key"):
+                raise RuntimeError("synthetic witness revocation not recorded")
+            if restarted.is_current(signed.attestation_id, now_unix=int(time.time())):
+                raise RuntimeError("synthetic revoked attestation remains active")
+        finally:
+            ledger_connection.close()
+        # Independent domain labels here are synthetic assertions only.
+        # The actual same-runner Restic remains BLOCKED by H24 and H25.
+        print("H26 PASS synthetic Ed25519 signature, persisted SQLite anti-replay "
+              "and key revocation; no off-host authorization", flush=True)
         print("H25 PASS reviewed source-pinned inspector and single-use scope ticket; "
               "local Restic off-host BLOCKED", flush=True)
         print("H24 PASS exact snapshot and provider pin checked; "
