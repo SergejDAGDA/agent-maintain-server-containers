@@ -22,3 +22,4 @@ jobs:
       - run: python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml plan
       - run: python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml validate
       - run: python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml plan
+      - run: python skills/maintain-server-containers/scripts/maintenance.py --policy examples/project-managed.yaml validate
