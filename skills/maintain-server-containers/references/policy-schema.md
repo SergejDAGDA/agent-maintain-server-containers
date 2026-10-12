@@ -114,6 +114,10 @@ release_management:
   automatic_updates: false
 ```
 
+`release_management` accepts only the four documented fields. Unknown fields invalidate the policy, and no arbitrary field/value is emitted in JSON reports. Use separate project-owned configuration for additional metadata and secrets.
+
+Extended policies require declared dependency-group references and a valid Compose project identity for automatic candidates. An undeclared or mismatched dependency group fails validation; it is not silently treated as a standalone service. Unknown **global** `safety_invariants` also fail closed: additional project-specific global rules need a versioned adapter with explicit semantics, not a generic whitelist.
+
 The same `release_management` fields are understood by portable and extended
 policies. Accepted strategies: `upstream_managed`, `project_managed`, and
 `externally_managed`. Accepted release authorities: `upstream_project`, `application_project`,
