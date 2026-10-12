@@ -137,6 +137,7 @@ def restore_fixture(checkpoint: Path, destination: Path) -> dict:
         for relative in _paths(checkpoint):
             shutil.copyfile(checkpoint / relative, staging / relative)
         restored = verify_state(staging)
+        staging.chmod(0o755)  # readonly fixture service runs as unprivileged nobody
         if restored != expected:
             raise ValueError("restored synthetic state differs")
         os.rename(staging, destination)
