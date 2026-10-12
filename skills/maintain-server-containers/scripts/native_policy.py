@@ -171,6 +171,9 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
         from release_management import validate_release_management
         errors.extend(validate_release_management(service, class_field="policy_class"))
         cls = service.get("policy_class")
+        from native_safety import safety_issues
+        for finding in safety_issues(service):
+            errors.append(f"{name}: {finding}")
         owner = service.get("ownership")
         if cls not in POLICIES:
             errors.append(f"{name}: unsupported policy_class")
@@ -297,6 +300,9 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
             result = "GATED"
             if owner in ("external_admin", "unknown"):
                 issues.append("ownership excludes automatic maintenance")
+            from native_safety import safety_issues
+            for finding in safety_issues(service):
+                issues.append(f"policy safety contract invalid: {finding}")
             state = service.get("state_contract", {})
             if not _obj(state) or state.get("completeness") != "complete":
                 issues.append("state contract incomplete")
@@ -331,6 +337,8 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
                 issues.append("PIN_ONLY may not change application contents")
             if issues:
                 result = "BLOCKED" if any(
+                    x.startswith("policy safety contract invalid:") for x in issues
+                ) or any(
                     x in issues for x in (
                         "ownership excludes automatic maintenance",
                         "state contract incomplete",
