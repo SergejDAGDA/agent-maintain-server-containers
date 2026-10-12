@@ -1,7 +1,7 @@
 # Changelog
 
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-10-12
 
 - Withhold unsupported service security-invariant values from all read-only CLI diagnostics; cover text and JSON reports for malformed untrusted values.
 
