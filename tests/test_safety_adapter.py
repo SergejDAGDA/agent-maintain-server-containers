@@ -213,8 +213,8 @@ class SafetyAdapterTest(unittest.TestCase):
                         if fmt == "json":
                             report = json.loads(output.getvalue())
                             self.assertFalse(report.get("policy_valid", report.get("valid", True)))
-                            self.assertEqual(len(report.get("services", [])), 3) if operation != "validate" else None
                             if operation != "validate":
+                                self.assertEqual(len(report["services"]), 3)
                                 self.assertTrue(all(
                                     service["runtime"]["status"] == "NOT_CHECKED"
                                     for service in report["services"]
