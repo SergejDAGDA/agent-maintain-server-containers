@@ -21,6 +21,8 @@ import time
 from pathlib import Path
 
 from harness import _run, containers, refuse_unless_ephemeral
+from pg_restic_fixture import PgResticFixture
+from restic_fixture import TEST_MARKER
 
 HERE = Path(__file__).resolve().parent
 COMPOSE = HERE / "fixture_pg.compose.yaml"
@@ -31,6 +33,12 @@ FORMAT = "msc-synthetic-postgres-group/v1"
 MEMBERS = ("db", "worker")
 FILE_NAME = re.compile(r"^asset-[a-f0-9]{12}\.bin$")
 PROJECT = re.compile(r"^msc-pg-(original|restored)-[a-f0-9]{12}$")
+
+# Pure, read-only recovery proof contract. Not an action authorization.
+sys.path.insert(0, str(HERE.parents[1] / "skills" / "maintain-server-containers" / "scripts"))
+from recovery_contract import (  # noqa: E402
+    plan_retention_dry_run, validate_checkpoint, validate_recovery_set,
+)
 
 
 def _checksum(data: bytes) -> str:
@@ -333,10 +341,11 @@ def run() -> None:
     restored_project = "msc-pg-restored-" + suffix
     source = sandbox / "source-assets"
     restored = sandbox / "restored-assets"
-    checkpoint = sandbox / "checkpoint"
+    checkpoint = sandbox / "pg-recovery-set"
     damaged = sandbox / "damaged"
     fatal = None
     try:
+        (sandbox / ".msc-restic-ci-only").write_text(TEST_MARKER + "\n", encoding="ascii")
         seed = seed_files(source)
         _run(["docker", "pull", IMAGE], timeout=180)
         original_ids = start(original_project, source)
@@ -355,15 +364,78 @@ def run() -> None:
             raise RuntimeError("damaged synthetic PostgreSQL recovery set accepted")
         if restored.exists():
             raise RuntimeError("damaged checkpoint unexpectedly initiated restore")
-        restore_files(checkpoint, restored, expected=seed)
+
+        # H20: encrypted local Restic snapshot for the complete PostgreSQL group.
+        # The direct test package MUST NOT be the source of restored app state.
+        provider = PgResticFixture(sandbox)
+        provider.initialize()
+        snapshot_id = provider.capture_pg(
+            checkpoint, validate=lambda item: verify_package(item, expected=seed),
+        )
+        group_recovery = {
+            "schema": "recovery-set/v1", "application": "synthetic-pg-group",
+            "compose": {"project": original_project,
+                        "source_digest": "sha256:" + _sha_file(COMPOSE)},
+            "images": {"db": IMAGE.split("@", 1)[1],
+                       "worker": IMAGE.split("@", 1)[1]},
+            "assets": [
+                {"id": "pgdb", "kind": "database", "backend": "postgresql",
+                 "consistency": "pg_dump", "reference": "synthetic-pg-database",
+                 "recovery_required": True},
+                {"id": "files", "kind": "user_files", "backend": "filesystem",
+                 "consistency": "snapshot_quiesced", "reference": "synthetic-pg-files",
+                 "recovery_required": True},
+                {"id": "key", "kind": "secret_reference", "backend": "external_reference",
+                 "consistency": "immutable_reference", "reference": "ci-key-responsibility",
+                 "recovery_required": True},
+            ],
+        }
+        declaration = validate_recovery_set(group_recovery)
+        if not declaration.valid or not declaration.fingerprint:
+            raise RuntimeError("synthetic PostgreSQL recovery-set identity invalid")
+        proof = {
+            "id": snapshot_id, "recovery_fingerprint": declaration.fingerprint,
+            "class": "PRE_UPGRADE", "provider": "restic",
+            "capture_complete": True, "repository_checked": True,
+            "isolated_restore_tested": False, "application_smoke_passed": False,
+            "holds": ["last_known_good"],
+        }
+        pending = validate_checkpoint(proof, recovery_fingerprint=declaration.fingerprint)
+        if not pending.valid or pending.restore_tested:
+            raise RuntimeError("premature PostgreSQL RESTORE_TESTED attestation")
+        provider.reject_incorrect_password()
+        # The password-failure test must not alter the working snapshot.
+        provider.check_pg(snapshot_id, package=checkpoint)
+
+        recovered_package = provider.restore_pg(
+            snapshot_id, package=checkpoint,
+            validate=lambda item: verify_package(item, expected=seed),
+        )
+        if recovered_package == checkpoint:
+            raise RuntimeError("Restic recovery did not create isolated package")
+        restore_files(recovered_package, restored, expected=seed)
         restored_ids = start(restored_project, restored)
-        restore_database(restored_ids, checkpoint, expected=seed)
+        restore_database(restored_ids, recovered_package, expected=seed)
         assert_group(restored_ids, restored, seed)
         assert_group(original_ids, source, seed)
         verify_package(checkpoint, expected=seed)
+        provider.check_pg(snapshot_id, package=checkpoint)
+        proof["isolated_restore_tested"] = True
+        proof["application_smoke_passed"] = True
+        checked = validate_checkpoint(proof, recovery_fingerprint=declaration.fingerprint)
+        if not checked.valid or not checked.restore_tested:
+            raise RuntimeError("PostgreSQL Restic checkpoint lacks restore proof")
+        retention = plan_retention_dry_run(
+            declaration.fingerprint, [proof], [snapshot_id],
+        )
+        if retention.blockers or retention.permitted_candidates or len(retention.protected) != 1:
+            raise RuntimeError("PostgreSQL known-good checkpoint not protected")
         print("F2-PG PASS PostgreSQL pg_dump + 3 files restored to separate two-service group",
               flush=True)
         print("F2-PG PASS incomplete/damaged group rejected, original unchanged", flush=True)
+        print("H20 PASS encrypted PostgreSQL Restic exact snapshot, repository check, "
+              "isolated two-service restore and protected known-good", flush=True)
+        print("H21 PASS invalid Restic password refused and snapshot preserved", flush=True)
     except Exception as error:
         fatal = error
     finally:
