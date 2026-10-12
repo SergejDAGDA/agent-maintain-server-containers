@@ -40,6 +40,9 @@ from recovery_contract import (  # noqa: E402
     plan_retention_dry_run, validate_checkpoint, validate_recovery_set,
 )
 from failure_domain_contract import assess_disaster_recovery  # noqa: E402
+from storage_provider_contract import (  # noqa: E402
+    assess_storage_evidence, validate_storage_provider,
+)
 from restic_fixture import ResticFixtureError  # noqa: E402
 
 
@@ -496,6 +499,56 @@ def run() -> None:
                 or "disaster:repository_not_off_host" not in boundary.blockers
                 or "disaster:shared_or_unknown_fault_domain" not in boundary.blockers):
             raise RuntimeError("synthetic local-only backup promoted to off-host readiness")
+        # H24: tie the exact CI snapshot and a pinned provider declaration
+        # to observed local evidence. Never promote the self-attested same-runner
+        # repository/key into independent off-host disaster recovery status.
+        descriptor = {
+            "schema": "backup-storage-provider/v1",
+            "provider_id": "synthetic-restic-ci",
+            "engine": "restic",
+            "adapter_source_digest": "sha256:" + _sha_file(HERE / "pg_restic_fixture.py"),
+            "repository_id": "ci-restic-repository",
+            "storage_class": "local",
+            "source_fault_domain": "ci-runner",
+            "repository_fault_domain": "ci-runner",
+            "key_authority_id": "synthetic-ci-key",
+            "key_fault_domain": "ci-runner",
+            "key_recovery_mode": "unverified",
+            "capabilities": ["exact_snapshot_lookup", "repository_data_check",
+                             "isolated_restore_observation"],
+        }
+        descriptor_result = validate_storage_provider(descriptor)
+        if not descriptor_result.valid or not descriptor_result.fingerprint:
+            raise RuntimeError("synthetic storage provider declaration invalid")
+        clock = int(time.time())
+        observation = {
+            "schema": "backup-storage-observation/v1",
+            "provider_fingerprint": descriptor_result.fingerprint,
+            "issuer_id": "synthetic-ci-only",
+            "repository_id": "ci-restic-repository",
+            "snapshot_id": snapshot_id,
+            "recovery_fingerprint": declaration.fingerprint,
+            "compose_source_digest": group_recovery["compose"]["source_digest"],
+            "observed_at_unix": clock,
+            "repository_accessible": True,
+            "snapshot_exact_match": True,
+            "repository_data_checked": True,
+            "key_retrievable": True,
+        }
+        storage_gate = assess_storage_evidence(
+            group_recovery, proof, descriptor, observation,
+            expected_provider_fingerprint=descriptor_result.fingerprint,
+            expected_issuer_id="synthetic-ci-only", now_unix=clock,
+            require_off_host=True,
+        )
+        if (storage_gate.status != "BLOCKED"
+                or storage_gate.restore_authorized or storage_gate.off_host_proven
+                or storage_gate.eligible_for_prune
+                or "storage:off_host_required" not in storage_gate.blockers
+                or "storage:shared_source_repository_domain" not in storage_gate.blockers):
+            raise RuntimeError("local provider was promoted to off-host backup guarantee")
+        print("H24 PASS exact snapshot and provider pin checked; "
+              "local-only storage remains off-host BLOCKED", flush=True)
         print("F2-PG PASS PostgreSQL pg_dump + 3 files restored to separate two-service group",
               flush=True)
         print("F2-PG PASS incomplete/damaged checkpoint refused before source loss", flush=True)
