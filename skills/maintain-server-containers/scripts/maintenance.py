@@ -187,18 +187,48 @@ def docker_snapshot(service: dict) -> dict:
         if proc.returncode:
             return {"status": "unverified", "reason": "inspect unavailable"}
         obj = json.loads(proc.stdout)
-        state = obj.get("State", {})
+        # Docker inspect is external input. Its shape is not guaranteed; do
+        # not allow malformed values to escape as AttributeError or accidentally
+        # be promoted to independently verified runtime evidence.
+        if not isinstance(obj, dict):
+            raise ValueError("malformed Docker inspect root")
+        state = obj.get("State")
+        config = obj.get("Config")
+        mounts = obj.get("Mounts")
+        if not isinstance(state, dict) or not isinstance(config, dict):
+            raise ValueError("malformed Docker state/config")
+        if not isinstance(mounts, list):
+            raise ValueError("malformed Docker mounts")
+        if not (isinstance(obj.get("Image"), str)
+                and isinstance(config.get("Image"), str)
+                and type(state.get("Running")) is bool
+                and isinstance(obj.get("Id"), str)):
+            raise ValueError("incomplete Docker runtime identity")
+        health = state.get("Health")
+        if health is not None and not isinstance(health, dict):
+            raise ValueError("malformed Docker health")
+        if health is not None and not isinstance(health.get("Status"), str):
+            raise ValueError("malformed Docker health status")
+        normalized_mounts = set()
+        for m in mounts:
+            if not isinstance(m, dict):
+                raise ValueError("malformed Docker mount")
+            if (not isinstance(m.get("Type"), str)
+                    or not isinstance(m.get("Destination"), str)
+                    or type(m.get("RW")) is not bool):
+                raise ValueError("malformed Docker mount attributes")
+            source = m.get("Name") or m.get("Source")
+            if not isinstance(source, str):
+                raise ValueError("malformed Docker mount source")
+            normalized_mounts.add((m["Type"], source, m["Destination"], not m["RW"]))
         return {
             "status": "verified",
-            "image_id": obj.get("Image"),
-            "configured_image": obj.get("Config", {}).get("Image"),
-            "running": state.get("Running"),
-            "health": state.get("Health", {}).get("Status", "none"),
-            "container_id": obj.get("Id"),
-            "mounts": sorted({
-                (m.get("Type"), m.get("Name") or m.get("Source"), m.get("Destination"),
-                 not bool(m.get("RW", True))) for m in obj.get("Mounts", [])
-            }, key=str),
+            "image_id": obj["Image"],
+            "configured_image": config["Image"],
+            "running": state["Running"],
+            "health": health["Status"] if health is not None else "none",
+            "container_id": obj["Id"],
+            "mounts": sorted(normalized_mounts, key=str),
         }
     except (OSError, subprocess.TimeoutExpired, ValueError, TypeError):
         return {"status": "unverified", "reason": "runtime inspection unavailable"}
