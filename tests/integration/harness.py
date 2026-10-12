@@ -113,7 +113,10 @@ def validate_rendered_compose(project: str, state: Path, env: dict) -> None:
         "capabilities_dropped": set(service.get("cap_drop", [])) == {"ALL"},
         "fixture_owner_label": service.get("labels", {}).get(LABEL) == "true",
         "exact_bind_paths": targets == approved and len(volumes) == 2,
-        # Compose may omit an explicit create_host_path: false when rendering\n        # JSON. Both source paths are pre-created and exact-match allowlisted.\n        "read_only_binds": state.is_dir() and not state.is_symlink()\n        and APP.is_file() and not APP.is_symlink() and all(
+        # Compose may omit an explicit create_host_path: false when rendering
+        # JSON. Both source paths are pre-created and exact-match allowlisted.
+        "read_only_binds": state.is_dir() and not state.is_symlink()
+        and APP.is_file() and not APP.is_symlink() and all(
             v.get("type") == "bind" and v.get("read_only") is True
             and v.get("bind", {}).get("create_host_path") in (False, None)
             for v in volumes
