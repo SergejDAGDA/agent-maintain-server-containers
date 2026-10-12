@@ -15,13 +15,51 @@ def parse_targeted_inspect(output: str) -> dict:
     if len(parts) != 15:
         raise ValueError("unexpected targeted inspect field count")
     p = [json.loads(line) for line in parts]
+    # Reject malformed projected values instead of interpreting strings such
+    # as "true" as booleans or "ALL" as a capability list. No raw values go
+    # into errors, reports, or logs.
+    def is_text(value):
+        return isinstance(value, str)
+    def text_list_or_null(value):
+        return value is None or (isinstance(value, list)
+                                 and all(is_text(x) for x in value))
+    fields = (
+        (0, is_text), (1, is_text), (2, lambda x: type(x) is bool),
+        (3, is_text), (4, lambda x: type(x) is int and x >= 0),
+        (5, lambda x: isinstance(x, list) and all(isinstance(m, dict)
+                                                   and is_text(m.get("Type"))
+                                                   and is_text(m.get("Destination"))
+                                                   and type(m.get("RW")) is bool
+                                                   for m in x)),
+        (6, lambda x: x is None or isinstance(x, dict)),
+        (7, lambda x: x is None or isinstance(x, dict)),
+        (8, lambda x: type(x) is bool), (9, lambda x: type(x) is bool),
+        (10, text_list_or_null), (11, text_list_or_null),
+        (12, text_list_or_null), (13, is_text), (14, is_text),
+    )
+    for index, predicate in fields:
+        if not predicate(p[index]):
+            raise ValueError(f"invalid type or missing Docker metadata field {index}")
+    for mount in p[5]:
+        if mount["Type"] == "bind" and not is_text(mount.get("Source")):
+            raise ValueError("invalid Docker bind source")
+        if mount["Type"] == "volume" and not is_text(mount.get("Name")):
+            raise ValueError("invalid Docker volume identity")
+    for value in (p[6] or {}).values():
+        if value is not None and (
+            not isinstance(value, list)
+            or not all(isinstance(v, dict)
+                       and is_text(v.get("HostIp"))
+                       and is_text(v.get("HostPort")) for v in value)
+        ):
+            raise ValueError("invalid Docker port binding metadata")
     return {
         "image_id": p[0], "configured_image": p[1],
         "running": p[2], "health": p[3], "restart_count": p[4],
-        "mounts": p[5], "ports": p[6], "networks": p[7],
+        "mounts": p[5], "ports": p[6] or {}, "networks": p[7] or {},
         "privileged": p[8], "readonly_root": p[9],
-        "cap_add": p[10], "cap_drop": p[11],
-        "security_opt": p[12], "user": p[13], "network_mode": p[14]
+        "cap_add": p[10] or [], "cap_drop": p[11] or [],
+        "security_opt": p[12] or [], "user": p[13], "network_mode": p[14]
     }
 
 
@@ -117,6 +155,15 @@ def contract_differences(service: dict, snapshots: list[dict]) -> list[str]:
     all_networks = set().union(*(set((s.get("networks") or {}).keys()) for s in snapshots))
     if set(topology.get("networks", [])) != all_networks:
         issues.append("Docker network names differ from policy")
+    for snap in snapshots:
+        mode = snap.get("network_mode")
+        if not isinstance(mode, str) or not mode:
+            issues.append("network mode evidence unavailable")
+        elif mode in {"host", "none"} or mode.startswith("container:"):
+            issues.append(f"non-standard network_mode {mode!r} requires explicit review")
+        declared_mode = topology.get("network_mode")
+        if declared_mode is not None and mode != declared_mode:
+            issues.append("Docker network mode differs from policy")
     required_health = service.get("health", {}).get("docker_expectation")
     for snap in snapshots:
         if required_health in ("healthy", "no_healthcheck") and snap.get("health") != required_health:
@@ -144,7 +191,13 @@ def contract_differences(service: dict, snapshots: list[dict]) -> list[str]:
         ):
             issues.append("cap-drop ALL policy mismatch")
         elif invariant == "read_only_docker_socket":
-            if not any(m.get("Destination") == "/var/run/docker.sock" and m.get("RW") is False for m in mounts):
+            if not any(
+                m.get("Type") == "bind"
+                and m.get("Source") == "/var/run/docker.sock"
+                and m.get("Destination") == "/var/run/docker.sock"
+                and m.get("RW") is False
+                for m in mounts
+            ):
                 issues.append("read-only docker socket identity mismatch")
         elif invariant == "lan_only_binding" and any(not _private_binding(p) for p in all_ports):
             issues.append("non-private published port present")
