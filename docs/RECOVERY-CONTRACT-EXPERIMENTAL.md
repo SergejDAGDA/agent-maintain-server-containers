@@ -127,3 +127,33 @@ proof of production-grade durable backup, replacement retention, automatic
 failover or a production multi-service restore executor. Provider integration,
 multi-service state contract trust, interruption, cancellation and
 state-aware migration remain separate future steps.
+
+## F2 PostgreSQL encrypted Restic recovery set (H20/H21, synthetic CI)
+
+The CI-only `pg_restic_fixture.py` extends the strictly bounded local
+`ResticFixture` runner. After PostgreSQL `pg_dump -Fc`, quiesced
+attachments, and manifest validation, it archives the **whole two-service
+recovery package** into a fresh encrypted Restic repository on the ephemeral
+GitHub runner. It validates an exact 64-character immutable snapshot ID,
+source path and fixture-only tag, and runs `restic check --read-data`. No
+`latest`, ambiguous prefix, remote store, `forget`, `prune`, or destructive
+command is accepted.
+
+A separate staging tree is restored **from the encrypted repository**. Its
+manifest, dump and three attachment checksums are validated before starting
+the separate PostgreSQL + worker Compose group, which receives `pg_restore`
+and then independently checks SQL records, worker access, and attachment
+digests. The original group and checkpoint remain unchanged. Incorrect
+password, incomplete or corrupted packages, foreign snapshot identities,
+missing proof, and pre-existing restore destinations fail closed. A
+provider-neutral `recovery-set/v1` evidence record is initially
+`REPOSITORY_CHECKED`; only after separate application smoke does the
+test mark it `RESTORE_TESTED`, and retention dry-run must protect the
+verified checkpoint.
+
+Passing H20/H21 demonstrates a **local, encrypted, fully synthetic** snapshot
+and isolated multi-service recovery. It is NOT off-host disaster recovery,
+atomic live database-plus-file capture with concurrent writes, a trusted
+attestation engine, a production provider or an authorized Docker executor.
+Production migration, rollback, backup scheduling and deletion remain
+separately gated.
