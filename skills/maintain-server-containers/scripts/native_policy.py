@@ -155,9 +155,9 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             "security_release_gate_bypass": "prohibited",
         }
         for key in invariants.keys() - required.keys():
-            # Never interpret unknown global safety rules as permissive or
-            # silently skip their intended meaning.
-            errors.append(f"unsupported global safety invariant: {key}")
+            # Identifiers as well as values are untrusted. Never echo a
+            # secret-bearing or identifying arbitrary policy key.
+            errors.append("unsupported global safety invariant (identifier withheld)")
         for key, expected in required.items():
             if invariants.get(key) != expected or type(invariants.get(key)) is not type(expected):
                 errors.append(f"required safety invariant missing or changed: {key}")
@@ -222,7 +222,8 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
         if _obj(ident):
             if cls in ("AUTO_SAFE", "AUTO_GATED", "PIN_ONLY") and not _safe_name(ident.get("compose_project")):
                 errors.append(f"{name}: identity.compose_project invalid")
-            elif "compose_project" in ident and not _safe_name(ident.get("compose_project")):
+            elif ("compose_project" in ident and ident.get("compose_project") is not None
+                  and not _safe_name(ident.get("compose_project"))):
                 errors.append(f"{name}: identity.compose_project malformed")
             names = ident.get("compose_services")
             if not isinstance(names, list) or not names or not all(_safe_name(x) for x in names):
@@ -230,9 +231,9 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
         deps = service.get("dependencies")
         if _obj(deps) and "update_group" in deps:
             group_name = deps["update_group"]
-            if not _safe_name(group_name):
-                errors.append(f"{name}: dependencies.update_group must be a valid non-empty group name")
-            elif not _obj(policy.get("service_groups")) or group_name not in policy["service_groups"]:
+            if group_name is not None and not _safe_name(group_name):
+                errors.append(f"{name}: dependencies.update_group must be null or a valid non-empty group name")
+            elif group_name is not None and (not _obj(policy.get("service_groups")) or group_name not in policy["service_groups"]):
                 errors.append(f"{name}: dependencies.update_group refers to undefined group")
         if cls == "NO_TOUCH" and (_obj(service.get("no_touch")) and service["no_touch"].get("enabled") is not True):
             errors.append(f"{name}: NO_TOUCH must have no_touch.enabled=true")
@@ -281,6 +282,8 @@ def _runtime(service: dict) -> dict:
             )
             if p.returncode:
                 return {"status": "UNVERIFIED", "reason": "Docker unavailable"}
+            if not isinstance(p.stdout, str):
+                return {"status": "UNVERIFIED", "reason": "Docker container listing unavailable"}
             ids = [s for s in p.stdout.splitlines() if s]
             if len(ids) != 1:
                 return {"status": "UNVERIFIED", "reason": "Compose service not unique"}
