@@ -5,13 +5,13 @@ on:
     paths:
       - ".github/workflows/integration.yml"
       - "tests/integration/**"
-      - "tests/test_integration_contract.py"
+      - "tests/test_integration_*.py"
   push:
     branches: [main]
     paths:
       - ".github/workflows/integration.yml"
       - "tests/integration/**"
-      - "tests/test_integration_contract.py"
+      - "tests/test_integration_*.py"
 
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Run offline recovery regressions
-        run: python -B -m unittest discover -s tests -p test_integration_contract.py -v
+      - name: Run offline recovery and authorization guard regressions
+        run: python -B -m unittest discover -s tests -p "test_integration_*.py" -v
       - name: Test disposable Compose startup, restore, corruption refusal and cleanup
         run: python -B tests/integration/harness.py --run
