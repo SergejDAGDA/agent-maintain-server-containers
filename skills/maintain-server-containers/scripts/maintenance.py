@@ -187,6 +187,8 @@ def docker_snapshot(service: dict) -> dict:
         proc = subprocess.run(command, text=True, capture_output=True, timeout=15, check=False)
         if proc.returncode:
             return {"status": "unverified", "reason": "docker unavailable"}
+        if not isinstance(proc.stdout, str):
+            return {"status": "unverified", "reason": "container listing unavailable"}
         ids = [s for s in proc.stdout.splitlines() if s]
         if len(ids) != 1:
             return {"status": "unverified", "reason": "expected exactly one Compose container"}
