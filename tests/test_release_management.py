@@ -9,6 +9,7 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parents[1] / "skills" / "maintain-server-containers" / "scripts"
 sys.path.insert(0, str(SCRIPT))
 import maintenance
+import native_policy
 from release_management import validate_release_management
 
 
@@ -73,6 +74,24 @@ class ReleaseManagementTest(unittest.TestCase):
         policy["services"][0]["release_management"] = deepcopy(CONFIG)
         _, issues = maintenance.normalize(policy)
         self.assertTrue(any("requires MANUAL or NO_TOUCH" in x for x in issues))
+
+    def test_extended_policy_accepts_explicit_no_touch_project_management(self):
+        path = Path(__file__).resolve().parents[1] / "examples/native-policy.yaml"
+        policy = maintenance.load_policy(path)
+        policy["services"][2]["release_management"] = deepcopy(CONFIG)
+        services, issues, warnings = native_policy.structure(policy)
+        self.assertFalse(issues, issues)
+        self.assertFalse(warnings, warnings)
+        result = native_policy.assess_native(policy, services)
+        self.assertEqual(result[2]["classification"], "EXCLUDED")
+        self.assertEqual(result[2]["release_management"]["strategy"], "project_managed")
+
+    def test_extended_policy_rejects_project_managed_auto_update(self):
+        path = Path(__file__).resolve().parents[1] / "examples/native-policy.yaml"
+        policy = maintenance.load_policy(path)
+        policy["services"][0]["release_management"] = deepcopy(CONFIG)
+        _, issues, _ = native_policy.structure(policy)
+        self.assertTrue(any("requires MANUAL or NO_TOUCH" in x for x in issues), issues)
 
     def test_existing_policies_remain_compatible(self):
         base = Path(__file__).resolve().parents[1] / "examples"
