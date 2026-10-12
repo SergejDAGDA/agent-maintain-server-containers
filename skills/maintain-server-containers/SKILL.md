@@ -108,4 +108,6 @@ Works with Docker Compose and project-defined adapters. Do not pretend the gener
 
 See [deployment-record.md](references/deployment-record.md) for owning and reconciling operational records and optional project-memory synchronization.
 
+Read [safety-adapter.md](references/safety-adapter.md) for the optional trusted extension API, adapter conformance checks and deployment-project ownership.
+
 Read `references/maintenance-protocol.md` for the canonical operator workflow, `references/project-deployment.md` for application-owned release deployment, `references/repository-deployment.md` for first-time third-party application installation, and `references/policy-schema.md` for portable policy semantics.
