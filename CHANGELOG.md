@@ -1,5 +1,19 @@
 # Changelog
 
+
+## 0.2.0 - Unreleased
+
+- Add `deploy-project <project> [release-id]` as an agent-operated,
+  explicitly authorized project-owned release deployment workflow.
+- Support local/private application release authority independent of
+  public upstream version monitoring.
+- Add optional validated `release_management` routing in both policy formats.
+- Coordinate post-deploy operational records, `maintain-project-memory`
+  Checkpoint and targeted `project-documentation` update without new handoffs.
+- Enforce existing MANUAL, NO_TOUCH and external ownership restrictions.
+- Synthetic policy fixture and regression tests.
+- This is an agent workflow, **not a bundled Docker mutation executor**.
+
 ## 0.1.0 - 2026-10-12
 
 - First public preview of the portable `maintain-server-containers` Agent Skill.
