@@ -97,13 +97,13 @@ def validate_recovery_set(document: Any) -> RecoverySetValidation:
         kind = asset.get("kind")
         backend = asset.get("backend")
         consistency = asset.get("consistency")
-        if not _identifier(aid) or aid in seen:
+        if not _identifier(aid) or (_identifier(aid) and aid in seen):
             errors.append(f"recovery_set:asset_{idx}_identity")
         if _identifier(aid):
             seen.add(aid)
-        if kind not in KINDS or backend not in BACKENDS:
+        if not isinstance(kind, str) or kind not in KINDS or not isinstance(backend, str) or backend not in BACKENDS:
             errors.append(f"recovery_set:asset_{idx}_type")
-        if consistency not in CONSISTENCY:
+        if not isinstance(consistency, str) or consistency not in CONSISTENCY:
             errors.append(f"recovery_set:asset_{idx}_consistency")
         if asset.get("recovery_required") is not True:
             errors.append(f"recovery_set:asset_{idx}_required")
@@ -143,13 +143,13 @@ def validate_checkpoint(document: Any, *, recovery_fingerprint: str) -> Checkpoi
         errors.append("checkpoint:immutable_id")
     if document.get("recovery_fingerprint") != recovery_fingerprint:
         errors.append("checkpoint:recovery_fingerprint_mismatch")
-    if document.get("class") not in CHECKPOINT_CLASSES:
+    if not isinstance(document.get("class"), str) or document["class"] not in CHECKPOINT_CLASSES:
         errors.append("checkpoint:class")
     if not _identifier(document.get("provider")):
         errors.append("checkpoint:provider")
     if document.get("capture_complete") is not True:
         errors.append("checkpoint:capture_not_proven")
-    if not isinstance(document.get("holds"), list) or any(x not in HOLD_REASONS for x in document.get("holds", []) if isinstance(document.get("holds"), list)):
+    if (not isinstance(document.get("holds"), list) or not all(isinstance(x, str) and x in HOLD_REASONS for x in document["holds"])):
         errors.append("checkpoint:holds")
     elif len(set(document["holds"])) != len(document["holds"]):
         errors.append("checkpoint:duplicate_holds")
