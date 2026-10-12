@@ -187,3 +187,44 @@ the original GitHub runner fault domain. Accordingly, the new contract
 synthetic application successfully reconstitutes on the same runner.
 Actual independent fault-domain delivery, key escrow, disaster-region
 availability and independently witnessed restore remain unimplemented.
+
+## Provider-neutral Backup Storage API proposal (PR #13, experimental)
+
+`storage_provider_contract.py` defines a **pure, read-only** interface for
+future reviewed storage inspectors. It does not implement Restic, Kopia, Borg,
+SSH, object-store APIs, capture, transfer, restore, remote access or deletion.
+Policy documents must never select executable adapter code.
+
+- `backup-storage-provider/v1`: declares logical provider/repository identity,
+  backup engine, independently pinned adapter source digest, expected source,
+  storage and key fault domains, and fixed observational capabilities.
+  `validate_storage_provider` rejects unknown fields, unsafe identifiers,
+  unreviewed capabilities and unknown adapter pins. It returns a canonical
+  fingerprint of the **declaration only**, not verified storage placement.
+- `backup-storage-observation/v1`: binds a claimed observation to the
+  canonical provider fingerprint, exact checkpoint ID, recovery-set fingerprint,
+  Compose source digest, repository identity, reviewer-selected issuer ID and
+  a bounded observation timestamp. Missing key, unavailable repository,
+  unreadable snapshot, changed source, stale clocks and mismatched issuers
+  fail closed.
+- `BackupStorageInspector` is a **typing Protocol only**, exposing hypothetical
+  read-only repository inventory and data-integrity inspection. Real adapters
+  must be reviewed and registered by trusted code, not selected from a policy.
+- `assess_storage_evidence` requires source/repository/key domain separation
+  and independently recoverable keys for disaster-recovery candidates.
+  Explicit local storage may be inventoried but never qualifies for off-host
+  disaster recovery. No structure or self-reported boolean authenticates its
+  own provenance. Even matching observations return `CANDIDATE_ONLY` with
+  `restore_authorized=False`, `off_host_proven=False` and
+  `eligible_for_prune=False`.
+
+H24 applies the same contract to the existing *local* encrypted Restic
+PostgreSQL fixture after actual CI restore and application smoke. The result
+**must be BLOCKED for off-host readiness**, despite exact snapshot, content
+checks and successful local restoration.
+
+**Out of scope:** trusted adapter registration, signed attestations or
+independent witnesses, remote backend provisioning, key custody, production
+credentials, retention mutation, production backup lifecycle, or treating the
+caller-supplied clock, expected fingerprint and issuer as independently trusted.
+The current `maintenance.py` CLI and v0.2.0 policy parser are untouched.
