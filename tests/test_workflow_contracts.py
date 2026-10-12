@@ -29,7 +29,7 @@ class DeploymentWorkflowTest(unittest.TestCase):
         for required in (
             "Docker socket", "untrusted", "public exposure",
             "existing user data", "MANUAL", "no pre-existing application user data",
-            "bounded initial deployment",
+            "bounded first installation",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
