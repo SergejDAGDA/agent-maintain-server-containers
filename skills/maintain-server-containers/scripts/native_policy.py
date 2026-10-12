@@ -1,4 +1,4 @@
-"""Read-only adapter for project policies using sandbox-server-maintenance/v1.
+"""Read-only adapter for extended project maintenance policies, version 1.
 
 This is a *format* adapter, not a server-specific implementation. It never
 copies project hostnames, paths or credentials to the public skill.
@@ -47,7 +47,7 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
     """
     errors: list[str] = []
     warnings: list[str] = []
-    if policy.get("schema") != "sandbox-server-maintenance/v1":
+    if not isinstance(policy.get("schema"), str) or not re.fullmatch(r"[a-z][a-z0-9-]*-maintenance/v1", policy["schema"]):
         errors.append("unsupported native policy schema")
     if policy.get("policy_revision") != 1:
         errors.append("unsupported native policy revision")
