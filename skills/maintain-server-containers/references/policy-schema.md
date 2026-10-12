@@ -62,3 +62,34 @@ The CLI also accepts an extended family of policies identified by `schema: <proj
 The adapter validates the presence of safety invariants and mutation-reporting dimensions. It leaves unknown migration gates unresolved. A group may refer to a subcomponent with a different policy logical name. Such aliases are reported for review, never invented or silently considered safe. `NO_TOUCH` records are excluded without Docker inspection. `MANUAL` records remain manual. A service with a declared `complete` contract is still **not** automatically ready for update: current upstream release, recovery evidence, precise target, topology, and smoke must be independently proved.
 
 The adapter is intentionally read-only. It does not translate the rich policy back into the simplified portable format or write to the original file. See `examples/native-policy.yaml` for synthetic data.
+
+
+### Explicit component aliases
+
+Extended policies may declare logical group member names that differ from their
+actual Docker Compose service identities. Declare each mismatch **in the
+consuming project's policy**, not in the portable skill:
+
+```yaml
+service_groups:
+  demo-stack:
+    services: [demo-web, demo-background]
+    component_aliases:
+      demo-background:
+        policy_service: demo-worker
+        compose_service: worker
+    update_as_group: true
+    manual_member_forces_group_manual: true
+```
+
+Here `demo-background` names a group component, `demo-worker` names its
+existing policy record, and `worker` must exactly match one of that record's
+`identity.compose_services` values. The record must declare
+`dependencies.update_group: demo-stack`. Normalization of hyphens, prefixes,
+container names or image tags is **never guessed**.
+
+For `update_as_group: true`, an unresolved, incorrect or conflicting alias
+makes structural validation **FAIL** rather than merely warning. A group
+containing a `MANUAL` or `NO_TOUCH` policy member remains blocked for
+automatic updates. Aliases do not grant new ownership or change the policies of
+the underlying service records.
