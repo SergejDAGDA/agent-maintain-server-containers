@@ -252,14 +252,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         data = load_policy(args.policy)
-        if data.get("schema") == "sandbox-server-maintenance/v1":
+        if (isinstance(data.get("schema"), str)
+                and data["schema"].endswith("-maintenance/v1")):
             from native_policy import structure, assess_native
             services, errors, warnings = structure(data)
             if args.runtime_json:
                 raise PolicyError("native policy adapter does not accept synthetic runtime evidence")
             if args.operation == "validate":
                 result = {
-                    "schema": "sandbox-server-maintenance/v1",
+                    "schema": data["schema"],
                     "services": len(services),
                     "valid": not errors,
                     "errors": errors,
