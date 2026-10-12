@@ -228,3 +228,39 @@ independent witnesses, remote backend provisioning, key custody, production
 credentials, retention mutation, production backup lifecycle, or treating the
 caller-supplied clock, expected fingerprint and issuer as independently trusted.
 The current `maintenance.py` CLI and v0.2.0 policy parser are untouched.
+
+## Code-registered read-only inspector and one-use observations (H25)
+
+`trusted_inspector_registry.py` is an **experimental in-process gate**.
+The calling program explicitly constructs an inspector object and supplies
+a `ReviewedInspector` binding. No policy string, YAML adapter path,
+dynamic import or observation JSON selects executable code. The registry
+re-hashes the **class source file** under an explicitly designated reviewed
+repository root and checks the SHA-256 against the provider declaration
+before each observation. An unknown or changed source/adapter pin fails closed.
+
+A scope-bound observation ticket includes the exact provider fingerprint,
+recovery-set fingerprint, snapshot ID and Compose digest. It is consumed
+on **first use**, including failures, and cannot be replayed in that registry
+instance. A short freshness bound rejects late or future uses. The registry
+itself dispatches only the code-registered inspector's three read-side
+methods and constructs the observation from their structured replies,
+instead of accepting an arbitrary observation document. Invalid responses
+or thrown exceptions are converted into constant diagnostic identifiers.
+
+H25 exercises this with a **directly instantiated, synthetic-only, read-side**
+PostgreSQL Restic inspector on the ephemeral GitHub runner. The real local
+Restic snapshot is checked again, the one-use ticket is consumed, a replay
+is rejected, and off-host readiness remains `BLOCKED`. No new production
+observer, remote backend, backup capture/restore authority or prune API is
+exposed.
+
+**Trust limitations:** Source hashing detects changed bytes in an identified
+local file. It is **not** a code-signing system, protected bootstrap, sandbox,
+remote evidence signature or defense against a compromised Python process,
+monkey-patched methods, forged trusted-root registration or malicious
+reviewed code. The registration site, source pins, trusted clock and runtime
+remain the responsibility of an independently reviewed caller.
+Tickets are only replay-protected in one process and are not a durable
+distributed anti-replay store. Every result remains non-authorizing even
+when it says `CANDIDATE_ONLY`. The shipped v0.2.0 skill and CLI are unchanged.
