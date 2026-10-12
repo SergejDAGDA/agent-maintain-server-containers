@@ -92,7 +92,7 @@ def validate_storage_provider(value: Any) -> ProviderValidation:
                  "repository_fault_domain", "key_authority_id", "key_fault_domain"):
         if not _identifier(value.get(name)):
             errors.append("storage:invalid_" + name)
-    if value.get("engine") not in ENGINES if isinstance(value.get("engine"), str) else True:
+    if not isinstance(value.get("engine"), str) or value["engine"] not in ENGINES:
         errors.append("storage:invalid_engine")
     if not _digest(value.get("adapter_source_digest")):
         errors.append("storage:invalid_adapter_pin")
@@ -101,10 +101,10 @@ def validate_storage_provider(value: Any) -> ProviderValidation:
     if value.get("key_recovery_mode") not in ("independent", "unverified"):
         errors.append("storage:invalid_key_recovery_mode")
     caps = value.get("capabilities")
-    if (not isinstance(caps, list)
-            or any(not isinstance(x, str) or x not in CAPABILITIES for x in caps)
-            or len(caps) != len(set(caps)) if isinstance(caps, list) and
-            all(isinstance(x, str) for x in caps) else True):
+    if (not isinstance(caps, list) or
+            any(not isinstance(x, str) or x not in CAPABILITIES for x in caps)):
+        errors.append("storage:invalid_capabilities")
+    elif len(caps) != len(set(caps)):
         errors.append("storage:invalid_capabilities")
     elif set(caps) != REQUIRED_CAPABILITIES:
         errors.append("storage:missing_required_capabilities")
