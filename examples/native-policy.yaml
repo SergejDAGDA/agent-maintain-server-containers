@@ -52,7 +52,7 @@ services:
     image:
       repository: example.invalid/web
       runtime_reference: example.invalid/web:1.0.0
-      immutable_identity: sha256:synthetic
+      immutable_identity: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     upstream: {authoritative_release_source: example.invalid/releases}
     version_policy: {allowed_automatic_range: 1.0.x, target_mode: patch_only}
     state_contract:
@@ -65,12 +65,12 @@ services:
       secrets: []
       instance_identity: synthetic-web
       disposable_caches: []
-    backup: {required: true, recovery_mechanism: synthetic}
-    migration: {possible: false, rollback_class: safe_image_and_source}
-    topology: {ports: [], networks: [synthetic_net], mounts_invariant: true}
-    health: {docker_expectation: healthy}
-    smoke: {profile: test-web}
-    rollback: {previous_image: example.invalid/web:1.0.0}
+    backup: {required: true, recovery_mechanism: synthetic, freshness_requirement: verify_before_mutation, restore_verification_requirement: synthetic_restore_test}
+    migration: {possible: false, rollback_class: safe_image_and_source, state_rollback_required: false}
+    topology: {ports: [], networks: [synthetic_net], mounts_invariant: true, container_identity: synthetic-web, security_invariants: []}
+    health: {docker_expectation: healthy, stability_window_seconds: 30}
+    smoke: {profile: test-web, generic: [container_running], service_specific: [http_probe]}
+    rollback: {previous_image: example.invalid/web:1.0.0, previous_image_identity: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, deployment_source: synthetic-source, state_rollback_may_be_required: false}
     dependencies: {update_group: synthetic-web-stack}
     no_touch: {enabled: false}
   - name: synthetic-worker
