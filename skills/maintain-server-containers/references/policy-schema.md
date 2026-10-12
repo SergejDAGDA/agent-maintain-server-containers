@@ -54,3 +54,11 @@ The bundled validator checks syntax, required fields and some logical contradict
 Project policy may add provenance, release ranges, dependency groups, adapter references, structured backup gates and state-specific checks. The skill must inspect them and fail closed if behavior is unknown, not silently ignore a security-critical rule. Upstream and integration adapters should be explicit, tested and versioned.
 
 A project with a pre-existing differently shaped `services.yaml` must map it to the portable contract or provide a validated adapter. File naming alone does not establish compatibility.
+
+## Extended, namespaced project policies
+
+The CLI also accepts an extended family of policies identified by `schema: <project>-maintenance/v1` and `policy_revision: 1`. This is a generic structural adapter, not a service-specific driver. Typical extended entries use `policy_class`, `identity.compose_project`, `identity.compose_services`, `deployment.server_source`, `state_contract.completeness`, `backup`, `migration`, `smoke`, `rollback`, and `dependencies`. A top-level `service_groups` mapping may describe composite stacks and subcomponents.
+
+The adapter validates the presence of safety invariants and mutation-reporting dimensions. It leaves unknown migration gates unresolved. A group may refer to a subcomponent with a different policy logical name. Such aliases are reported for review, never invented or silently considered safe. `NO_TOUCH` records are excluded without Docker inspection. `MANUAL` records remain manual. A service with a declared `complete` contract is still **not** automatically ready for update: current upstream release, recovery evidence, precise target, topology, and smoke must be independently proved.
+
+The adapter is intentionally read-only. It does not translate the rich policy back into the simplified portable format or write to the original file. See `examples/native-policy.yaml` for synthetic data.
