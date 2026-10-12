@@ -95,6 +95,8 @@ def normalize(data: dict) -> tuple[list[dict], list[str]]:
         for field in ("deployment", "state", "backup", "rollback", "health", "smoke", "target"):
             if field in entry and not isinstance(entry[field], dict):
                 errors.append(f"{name}: {field} must be a mapping")
+        from release_management import validate_release_management
+        errors.extend(validate_release_management(entry, class_field="policy"))
         normalized.append(entry)
     return normalized, errors
 
@@ -237,6 +239,7 @@ def assessment(service: dict, runtime: dict | None) -> dict:
             "configured_image": r.get("configured_image"),
             "image_id": r.get("image_id")
         },
+        "release_management": service.get("release_management"),
         "proposed_target": (service.get("target", {}).get("image")
                             if isinstance(service.get("target"), dict) else None),
     }
