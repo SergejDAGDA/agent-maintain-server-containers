@@ -26,7 +26,8 @@ class FailureDomainAssessment:
 
 
 def _id(value: Any) -> bool:
-    return isinstance(value, str) and bool(IDENTIFIER.fullmatch(value))
+    return (isinstance(value, str) and value.lower() not in {"unknown", "none", "unresolved"}
+            and bool(IDENTIFIER.fullmatch(value)))
 
 
 def assess_disaster_recovery(
