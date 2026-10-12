@@ -11,6 +11,8 @@ on:
       - "skills/maintain-server-containers/scripts/recovery_contract.py"
       - "skills/maintain-server-containers/scripts/migration_contract.py"
       - "skills/maintain-server-containers/scripts/failure_domain_contract.py"
+      - "skills/maintain-server-containers/scripts/storage_provider_contract.py"
+      - "tests/test_storage_provider_contract.py"
       - "tests/test_failure_domain_contract.py"
       - "tests/test_migration_contract.py"
   push:
@@ -24,6 +26,8 @@ on:
       - "skills/maintain-server-containers/scripts/recovery_contract.py"
       - "skills/maintain-server-containers/scripts/migration_contract.py"
       - "skills/maintain-server-containers/scripts/failure_domain_contract.py"
+      - "skills/maintain-server-containers/scripts/storage_provider_contract.py"
+      - "tests/test_storage_provider_contract.py"
       - "tests/test_failure_domain_contract.py"
       - "tests/test_migration_contract.py"
 
