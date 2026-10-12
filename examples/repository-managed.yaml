@@ -1,0 +1,37 @@
+# Entirely synthetic example of the policy record produced after a reviewed
+# first installation of an externally sourced, upstream-managed application.
+# All names, images, and locations are nonfunctional examples.
+schema_version: "1"
+services:
+  - name: example-service
+    policy: MANUAL
+    ownership: sandbox
+    deployment:
+      compose_file: ./deploy/example-service.compose.yaml
+      project: isolated-example
+      service: app
+    image:
+      current: example.invalid/isolated/app:1.2.3
+    release_management:
+      strategy: upstream_managed
+      release_authority: deployment_project
+      version_monitoring: true
+      automatic_updates: false
+    state:
+      complete: true
+      binds:
+        - source: ./state/example-service
+          target: /app/data
+          mode: rw
+      volumes: []
+      databases: []
+      user_files: [./state/example-service]
+      secret_refs: []
+    backup:
+      required: true
+    rollback:
+      class: unknown
+    health:
+      container: healthy
+    smoke:
+      profile: application-defined
