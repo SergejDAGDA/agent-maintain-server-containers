@@ -175,9 +175,9 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
         for finding in safety_issues(service):
             errors.append(f"{name}: {finding}")
         owner = service.get("ownership")
-        if cls not in POLICIES:
+        if not isinstance(cls, str) or cls not in POLICIES:
             errors.append(f"{name}: unsupported policy_class")
-        if owner not in OWNERS:
+        if not isinstance(owner, str) or owner not in OWNERS:
             errors.append(f"{name}: unsupported ownership")
         for key in ("identity", "deployment", "image", "upstream",
                     "version_policy", "state_contract", "backup", "migration",
