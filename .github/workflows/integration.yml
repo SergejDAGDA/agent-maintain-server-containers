@@ -7,6 +7,8 @@ on:
       - "tests/integration/**"
       - "tests/test_integration_*.py"
       - "tests/test_restic_fixture_contract.py"
+      - "tests/test_recovery_contract.py"
+      - "skills/maintain-server-containers/scripts/recovery_contract.py"
   push:
     branches: [main]
     paths:
@@ -14,6 +16,8 @@ on:
       - "tests/integration/**"
       - "tests/test_integration_*.py"
       - "tests/test_restic_fixture_contract.py"
+      - "tests/test_recovery_contract.py"
+      - "skills/maintain-server-containers/scripts/recovery_contract.py"
 
 permissions:
   contents: read
