@@ -66,3 +66,33 @@ See `tests/integration/harness.py` and `tests/test_recovery_contract.py`. This p
 - Version the resulting stable contract and plugin manifests together at release time. Merely landing source on `main` does not automatically update installed skills.
 
 The current shipped `maintenance.py` remains read-only.
+
+## Experimental migration-sensitive rollback refusal (H06)
+
+The separate pure module `migration_contract.py` evaluates a proposed
+**image-only rollback** following an observed incompatible schema change and a
+bounded interruption *after the schema transaction commits*. Its only outcomes
+are `BLOCKED` and `RECOVERY_REQUIRED`. Both set
+`image_only_allowed=False`. Neither executes a restore or authorizes an
+image change.
+
+`RECOVERY_REQUIRED` requires a matching `recovery-set/v1` fingerprint,
+complete isolated-restore + application-smoke proof for a held
+`PRE_MIGRATION` checkpoint, exact image and Compose identities, fresh
+expected/observed runtime identity parity, a complete database migration scope
+and an observed changed schema. The response identifies only the checkpoint ID
+and a **separately authorized** state-aware recovery planning task. Any
+incomplete evidence, stale identity, unresolved scope, missing protection,
+unknown schema or unproven failure becomes `BLOCKED`, without an executable
+rollback path.
+
+The disposable GitHub Actions harness now exercises a **synthetic-only** SQLite
+v1 to v2 table/column rename, commits it, injects a later simulated upgrade
+failure and confirms that the old v1 reader rejects it. It verifies that the
+previous Restic checkpoint remains independently checked, restored into an
+isolated v1 Compose project and smoke-tested. It never runs a Docker image
+update, downgrade, production restore or backup deletion. H06 tests the
+migration **refusal** contract, not H04's full update executor or recovery
+authorization. Caller-provided evidence is not independent attestation. A
+future trusted executor must establish and bind runtime observations and proof
+before acting.

@@ -9,6 +9,8 @@ on:
       - "tests/test_restic_fixture_contract.py"
       - "tests/test_recovery_contract.py"
       - "skills/maintain-server-containers/scripts/recovery_contract.py"
+      - "skills/maintain-server-containers/scripts/migration_contract.py"
+      - "tests/test_migration_contract.py"
   push:
     branches: [main]
     paths:
@@ -18,6 +20,8 @@ on:
       - "tests/test_restic_fixture_contract.py"
       - "tests/test_recovery_contract.py"
       - "skills/maintain-server-containers/scripts/recovery_contract.py"
+      - "skills/maintain-server-containers/scripts/migration_contract.py"
+      - "tests/test_migration_contract.py"
 
 permissions:
   contents: read
