@@ -16,10 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from recovery_contract import validate_checkpoint, validate_recovery_set
-from storage_provider_contract import (
-    StorageEvidenceAssessment, assess_storage_evidence, validate_storage_provider,
-)
+from recovery_contract import HEX_SHA256, IDENTIFIER, validate_checkpoint, validate_recovery_set
+from storage_provider_contract import assess_storage_evidence, validate_storage_provider
 
 
 class RegistryRefusal(RuntimeError):
@@ -63,7 +61,7 @@ class ReviewedInspectorRegistry:
     """Code-only registry. A policy may describe a provider, never register one."""
 
     def __init__(self, trusted_root: Path, bindings: tuple[ReviewedInspector, ...]):
-        if type(trusted_root) is not Path or not trusted_root.is_dir() or trusted_root.is_symlink():
+        if not isinstance(trusted_root, Path) or not trusted_root.is_dir() or trusted_root.is_symlink():
             raise RegistryRefusal("registry:invalid_trusted_root")
         self._root = trusted_root.resolve()
         if not isinstance(bindings, tuple) or not bindings:
@@ -75,8 +73,10 @@ class ReviewedInspectorRegistry:
                     or not isinstance(entry.issuer_id, str)
                     or not isinstance(entry.provider_fingerprint, str)
                     or not isinstance(entry.source_digest, str)
-                    or not entry.provider_fingerprint.startswith("sha256:")
-                    or not entry.source_digest.startswith("sha256:")
+                    or not bool(HEX_SHA256.fullmatch(entry.provider_fingerprint))
+                    or not bool(HEX_SHA256.fullmatch(entry.source_digest))
+                    or not bool(IDENTIFIER.fullmatch(entry.provider_id))
+                    or not bool(IDENTIFIER.fullmatch(entry.issuer_id))
                     or entry.provider_id in registered):
                 raise RegistryRefusal("registry:invalid_or_duplicate_binding")
             self._source_check(entry)
@@ -203,8 +203,6 @@ class ReviewedInspectorRegistry:
                 max_age_seconds=max_age_seconds, require_off_host=require_off_host,
             )
             return RegisteredEvidenceResult(checked.status, checked.blockers)
-        except (Exception, BaseException) as exc:
+        except Exception:
             # Never leak raw adapter exception/credentials or grant permission.
-            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-                raise
             return RegisteredEvidenceResult("BLOCKED", ("registry:inspector_failed",))
