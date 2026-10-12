@@ -10,6 +10,8 @@ on:
       - "tests/test_recovery_contract.py"
       - "skills/maintain-server-containers/scripts/recovery_contract.py"
       - "skills/maintain-server-containers/scripts/migration_contract.py"
+      - "skills/maintain-server-containers/scripts/failure_domain_contract.py"
+      - "tests/test_failure_domain_contract.py"
       - "tests/test_migration_contract.py"
   push:
     branches: [main]
@@ -21,6 +23,8 @@ on:
       - "tests/test_recovery_contract.py"
       - "skills/maintain-server-containers/scripts/recovery_contract.py"
       - "skills/maintain-server-containers/scripts/migration_contract.py"
+      - "skills/maintain-server-containers/scripts/failure_domain_contract.py"
+      - "tests/test_failure_domain_contract.py"
       - "tests/test_migration_contract.py"
 
 permissions:
