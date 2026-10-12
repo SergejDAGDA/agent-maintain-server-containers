@@ -116,7 +116,7 @@ release_management:
 
 `release_management` accepts only the four documented fields. Unknown fields invalidate the policy, and no arbitrary field/value is emitted in JSON reports. Use separate project-owned configuration for additional metadata and secrets.
 
-Extended policies require declared dependency-group references and a valid Compose project identity for automatic candidates. An undeclared or mismatched dependency group fails validation; it is not silently treated as a standalone service. Unknown **global** `safety_invariants` also fail closed: additional project-specific global rules need a versioned adapter with explicit semantics, not a generic whitelist.
+Extended policies require declared dependency-group references and a valid Compose project identity for automatic candidates. An undeclared or mismatched dependency group fails validation; it is not silently treated as a standalone service. Unknown **global** `safety_invariants` also fail closed unless each extra rule is explicitly claimed and validated by a version/digest-matched, trusted in-process adapter supplied by the consuming project. The default CLI does not load plugins from policy paths. See [safety-adapter.md](safety-adapter.md); no generic whitelist or optional adapter can override the core rules.
 
 The same `release_management` fields are understood by portable and extended
 policies. Accepted strategies: `upstream_managed`, `project_managed`, and
