@@ -61,7 +61,8 @@ class SecondReviewRegressionTest(unittest.TestCase):
         p = self.native_policy()
         p["services"][0]["topology"]["security_invariants"] = ["allow_privileged"]
         _, errs, _ = native_policy.structure(p)
-        self.assertTrue(any("allow_privileged" in err for err in errs), errs)
+        self.assertTrue(any("unsupported invariant (value withheld)" in err for err in errs), errs)
+        self.assertFalse(any("allow_privileged" in err for err in errs), errs)
 
     def test_valid_special_user_invariant_allowed(self):
         p = self.native_policy()
