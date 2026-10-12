@@ -1,0 +1,69 @@
+# Synthetic-only F2 multi-service PostgreSQL + worker fixture.
+# Database state lives ONLY on tmpfs. Network is internal, no published ports.
+# CI pulls this immutable, reviewed bookworm index digest before Compose startup.
+services:
+  db:
+    image: postgres:16.10-bookworm@sha256:38471f330eb885e04de130b768d6db4e10469e2311879c7e5c699f6d2d8a1c74
+    user: "999:999"
+    read_only: true
+    environment:
+      POSTGRES_USER: fixture
+      POSTGRES_DB: fixture
+      POSTGRES_PASSWORD: synthetic-fixture-only-not-a-secret
+      PGDATA: /var/lib/postgresql/data/pgdata
+    tmpfs:
+      - /var/lib/postgresql/data:uid=999,gid=999,mode=1777
+      - /var/run/postgresql:uid=999,gid=999,mode=0770
+      - /tmp:uid=999,gid=999,mode=1777
+    networks: [isolated]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 80
+    mem_limit: 320m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "fixture", "-d", "fixture"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 4s
+    labels:
+      org.openai.maintain-server-containers.test: "true"
+  worker:
+    image: postgres:16.10-bookworm@sha256:38471f330eb885e04de130b768d6db4e10469e2311879c7e5c699f6d2d8a1c74
+    entrypoint: ["sh", "-c"]
+    command: ["sleep 600"]
+    # Override the official image VOLUME metadata, never leave anonymous DB volumes.
+    tmpfs:
+      - /var/lib/postgresql/data:uid=999,gid=999,mode=1777
+    user: "999:999"
+    read_only: true
+    environment:
+      PGPASSWORD: synthetic-fixture-only-not-a-secret
+    networks: [isolated]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${MSC_PG_ASSETS:?synthetic-only asset directory required}
+        target: /assets
+        read_only: true
+        bind:
+          create_host_path: false
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 40
+    mem_limit: 160m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "db", "-U", "fixture", "-d", "fixture"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 4s
+    labels:
+      org.openai.maintain-server-containers.test: "true"
+networks:
+  isolated:
+    internal: true

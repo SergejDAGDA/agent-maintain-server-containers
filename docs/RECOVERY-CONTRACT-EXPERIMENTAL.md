@@ -96,3 +96,34 @@ migration **refusal** contract, not H04's full update executor or recovery
 authorization. Caller-provided evidence is not independent attestation. A
 future trusted executor must establish and bind runtime observations and proof
 before acting.
+
+## Synthetic PostgreSQL two-service recovery fixture (F2, experimental)
+
+`tests/integration/pg_group_harness.py` is a **separate** GitHub-hosted
+CI-only exercise. It provisions an ephemeral internal-network Compose
+`db + worker` group with an immutable PostgreSQL image reference and
+throws away its database cluster in tmpfs after the test. Synthetic
+identifiers and three related binary attachments are generated fresh.
+
+The test uses PostgreSQL's `pg_dump -Fc`, which reads from a consistent
+database snapshot, while the fixture has no attachment writers. It captures
+a group checkpoint with the exact two required members, Compose source
+digest, pinned image identity, dump checksum, and per-file checksums. It
+rejects any damaged dump, missing file, partial group membership, foreign
+source identity or mismatching recovery metadata **before** restoring.
+
+An independent Compose project initializes a fresh database, receives
+`pg_restore`, and runs SQL/attachment verification both inside the DB
+container and through the independent worker. The source group is checked
+again, and only fixture-owned containers, an internal network, ephemeral
+tmpfs and synthetic directories are cleaned. The fixture has no published
+ports, production credentials or real server access.
+
+**Scope limits:** This is a coherent capture only for a quiescent artificial
+file set, not a guarantee of atomic capture under concurrent DB/file writes.
+The local package is not an independently stored or Restic-protected
+off-host checkpoint. It has checksums and an isolated restore smoke, not
+proof of production-grade durable backup, replacement retention, automatic
+failover or a production multi-service restore executor. Provider integration,
+multi-service state contract trust, interruption, cancellation and
+state-aware migration remain separate future steps.

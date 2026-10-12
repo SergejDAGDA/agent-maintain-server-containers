@@ -50,3 +50,5 @@ jobs:
         run: python -B -m unittest discover -s tests -p "test_restic_fixture_contract.py" -v
       - name: Test disposable Compose startup, restore, corruption refusal and cleanup
         run: python -B tests/integration/harness.py --run
+      - name: Test synthetic PostgreSQL multi-service recovery and bounded cleanup
+        run: python -B tests/integration/pg_group_harness.py --run
