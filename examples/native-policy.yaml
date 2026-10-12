@@ -28,7 +28,11 @@ backup_defaults:
   required_for_runtime_mutation: true
 service_groups:
   synthetic-web-stack:
-    services: [synthetic-web, synthetic-worker]
+    services: [synthetic-web, synthetic-background]
+    component_aliases:
+      synthetic-background:
+        policy_service: synthetic-worker
+        compose_service: worker
     update_as_group: true
     manual_member_forces_group_manual: true
 smoke_profiles:
