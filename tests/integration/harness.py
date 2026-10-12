@@ -7,6 +7,7 @@ execution even if Docker is available. No default-Docker host on developer PC.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import secrets
@@ -20,6 +21,11 @@ from pathlib import Path
 from fixture_app import verify_state
 from fixture_backup import capture_fixture, restore_fixture, seed_fixture, verify_checkpoint
 from restic_fixture import ResticFixture, TEST_MARKER
+
+# Pure contract code only. No mutation executor or production backup interface.
+SKILL_SCRIPTS = Path(__file__).resolve().parents[2] / "skills" / "maintain-server-containers" / "scripts"
+sys.path.insert(0, str(SKILL_SCRIPTS))
+from recovery_contract import validate_checkpoint, validate_recovery_set, plan_retention_dry_run  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 COMPOSE = HERE / "fixture.compose.yaml"
@@ -225,11 +231,48 @@ def run_harness() -> None:
         snapshot_id = restic.capture(restic_source)
         evidence = restic.restore_and_verify(snapshot_id, staged_checkpoint=restic_source,
                                              restored_state=restic_restored)
+        contract = {
+            "schema": "recovery-set/v1",
+            "application": "synthetic-fixture",
+            "compose": {"project": original_project,
+                        "source_digest": "sha256:" + hashlib.sha256(COMPOSE.read_bytes()).hexdigest()},
+            "images": {"fixture": IMAGE.rsplit("@", 1)[1]},
+            "assets": [
+                {"id": "db", "kind": "database", "backend": "sqlite",
+                 "consistency": "sqlite_backup_api", "reference": "synthetic-sqlite",
+                 "recovery_required": True},
+                {"id": "files", "kind": "user_files", "backend": "filesystem",
+                 "consistency": "snapshot_quiesced", "reference": "synthetic-attachments",
+                 "recovery_required": True},
+                {"id": "key", "kind": "secret_reference", "backend": "external_reference",
+                 "consistency": "immutable_reference", "reference": "ci-only-key-authority",
+                 "recovery_required": True},
+            ],
+        }
+        evaluated = validate_recovery_set(contract)
+        if not evaluated.valid or not evaluated.fingerprint:
+            raise RuntimeError("synthetic recovery-set declaration invalid")
+        checkpoint_proof = {
+            "id": snapshot_id, "recovery_fingerprint": evaluated.fingerprint,
+            "class": "PRE_UPGRADE", "provider": "restic",
+            "capture_complete": True, "repository_checked": evidence.repository_checked,
+            "isolated_restore_tested": evidence.restore_tested,
+            "application_smoke_passed": False, "holds": ["last_known_good"],
+        }
         if not evidence.repository_checked or not evidence.restore_tested:
             raise RuntimeError("Restic recovery evidence incomplete")
         start_fixture(restic_project, restic_restored)
         if verify_state(restic_restored) != seed:
             raise RuntimeError("Restic-restored fixture health differs")
+        checkpoint_proof["application_smoke_passed"] = True
+        result = validate_checkpoint(checkpoint_proof, recovery_fingerprint=evaluated.fingerprint)
+        if not result.valid or not result.restore_tested:
+            raise RuntimeError("synthetic checkpoint not proved restored")
+        retention = plan_retention_dry_run(evaluated.fingerprint,
+                                            [checkpoint_proof], [snapshot_id])
+        if retention.blockers or retention.permitted_candidates or len(retention.protected) != 1:
+            raise RuntimeError("verified known-good checkpoint not protected")
+        print("H19 PASS provider-neutral recovery proof and retention protection", flush=True)
         restic.reject_incorrect_password()
         restic.check_snapshot(snapshot_id, staged_checkpoint=restic_source)
         print("H16 PASS encrypted Restic snapshot and repository data check", flush=True)
