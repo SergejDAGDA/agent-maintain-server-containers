@@ -22,7 +22,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Maintain Server Containers",
-    "shortDescription": "Audit, plan and safely maintain Docker Compose services",
+    "shortDescription": "Audit Docker and guide safe project/repository deployments",
     "developerName": "Sergej DAGDA",
     "category": "Developer Tools",
     "capabilities": [
@@ -34,8 +34,8 @@
       "Audit my Compose server without changing its state.",
       "Plan available container updates and tell me which are safe.",
       "Update eligible AUTO_SAFE services under the current project's maintenance policy while preserving data.",
-      "Deploy the latest approved release of my project-managed application, verify persistent state and update project memory after success."
+      "Deploy the latest approved release of my project-managed application, verify persistent state and, if optional project-memory tooling is available and authorized, checkpoint confirmed deployment facts; otherwise report pending sync."
     ],
-    "longDescription": "Audit and plan container maintenance; deploy explicitly approved application-project builds under a bounded, state-preserving workstream and synchronize verified deployment records and project memory."
+    "longDescription": "Audit and plan container maintenance; guide bounded agent-run deployment of approved project builds or external repositories. Core operations do not require other Agent Skills; optional memory/documentation synchronization may remain pending."
   }
 }
