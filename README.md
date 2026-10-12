@@ -163,7 +163,7 @@ The consuming project owns `maintenance/services.yaml`. The public skill contain
 
 Portable v1 services can be declared with `services` as either a YAML list or a mapping. A candidate entry names its Compose project/service, image, explicit target, ownership, persistence contract, backup requirement, rollback class, health and smoke profile.
 
-Read [policy-schema.md](skills/maintain-server-containers/references/policy-schema.md) before using the schema in production. A pre-existing project-specific `services.yaml` is **not automatically compatible** merely because it has the same filename.
+Read [policy-schema.md](skills/maintain-server-containers/references/policy-schema.md) before using the schema in production. A pre-existing project-specific `services.yaml` is **not automatically compatible** merely because it has the same filename. Extra project-owned safety rules require the [trusted adapter contract](skills/maintain-server-containers/references/safety-adapter.md); the bundled CLI fails closed without an adapter and cannot import one from policy YAML.
 
 
 ### Component names in dependency groups
