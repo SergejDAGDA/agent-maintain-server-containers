@@ -5,7 +5,12 @@ No Docker daemon, SSH, or mutating operation is invoked.
 from copy import deepcopy
 from pathlib import Path
 import json
+import contextlib
+import io
 import sys
+import tempfile
+from unittest import mock
+import yaml
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +40,28 @@ class NativeSemanticAndRuntimeTest(unittest.TestCase):
         self.assertTrue(any("databases" in x for x in errors), errors)
         result = assess_native(data, data["services"])
         self.assertEqual(result[0]["classification"], "BLOCKED")
+
+    def test_invalid_native_policy_keeps_inventory_and_never_inspects_docker(self):
+        policy = self.policy()
+        policy["services"][0]["state_contract"]["databases"] = "unknown"
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "policy.yaml"
+            path.write_text(yaml.safe_dump(policy), encoding="utf-8")
+            output = io.StringIO()
+            with mock.patch("native_policy._runtime", side_effect=AssertionError(
+                    "must not access Docker with invalid policy")):
+                with contextlib.redirect_stdout(output):
+                    rc = maintenance.main([
+                        "--policy", str(path), "--live", "--format", "json", "audit"
+                    ])
+            self.assertEqual(rc, 2)
+            result = json.loads(output.getvalue())
+            self.assertEqual(len(result["services"]), 3)
+            self.assertFalse(result["policy_valid"])
+            self.assertEqual(result["services"][0]["classification"], "BLOCKED")
+            self.assertEqual(result["services"][0]["runtime"]["status"], "NOT_CHECKED")
+            self.assertEqual(result["services"][1]["classification"], "MANUAL_REVIEW")
+            self.assertEqual(result["services"][2]["classification"], "EXCLUDED")
 
     def test_unknown_state_even_when_complete_fails(self):
         data = self.policy()
