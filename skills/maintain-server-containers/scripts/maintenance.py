@@ -60,14 +60,20 @@ def load_policy(path: Path) -> dict:
 def normalize(data: dict) -> tuple[list[dict], list[str]]:
     """Normalize the documented portable v1 schema. Never assume unknown fields are safe."""
     errors: list[str] = []
-    version = str(data.get("schema_version", ""))
-    if version != POLICY_VERSION:
+    version = data.get("schema_version")
+    if type(version) is not str or version != POLICY_VERSION:
         errors.append("schema_version must be '1' (explicit migration required)")
     raw = data.get("services")
     if isinstance(raw, dict):
         # Named mapping accepted for simple project configuration.
-        entries = [dict({"name": key}, **value) if isinstance(value, dict) and "name" not in value
-                   else value for key, value in raw.items()]
+        entries = []
+        for key, value in raw.items():
+            if isinstance(value, dict) and "name" not in value:
+                entry = dict(value)
+                entry["name"] = key
+                entries.append(entry)
+            else:
+                entries.append(value)
     elif isinstance(raw, list):
         entries = raw
     else:
@@ -92,6 +98,8 @@ def normalize(data: dict) -> tuple[list[dict], list[str]]:
             errors.append(f"{name}: invalid or missing policy")
         if not isinstance(ownership, str) or ownership not in OWNERS:
             errors.append(f"{name}: invalid or missing ownership")
+        if any(not isinstance(key, str) for key in entry):
+            errors.append(f"{name}: service field keys must all be strings")
         for field in ("deployment", "state", "backup", "rollback", "health", "smoke", "target"):
             if field in entry and not isinstance(entry[field], dict):
                 errors.append(f"{name}: {field} must be a mapping")
@@ -325,7 +333,7 @@ def main(argv: list[str] | None = None) -> int:
                             "classification": classification, "issues": problems,
                             "runtime": {"status": "NOT_CHECKED"},
                             "target_candidate": None,
-                            "release_management": svc.get("release_management")
+                            "release_management": public_release_management(svc)
                         })
                 else:
                     records = assess_native(data, services, live=args.live)
@@ -357,6 +365,7 @@ def main(argv: list[str] | None = None) -> int:
                 for warning in warnings:
                     print(f"NOTE: {warning}")
             return 2 if errors else 0
+        from release_management import public_release_management
         services, errors = normalize(data)
         if args.live and args.runtime_json:
             raise PolicyError("--live and --runtime-json cannot be combined")
@@ -365,7 +374,8 @@ def main(argv: list[str] | None = None) -> int:
         # even read-only live inspection.
         service_errors = {}
         for service in services:
-            if service.get("policy") in {"MANUAL", "NO_TOUCH"}:
+            service_class = service.get("policy")
+            if isinstance(service_class, str) and service_class in {"MANUAL", "NO_TOUCH"}:
                 service_errors[service["name"]] = []
                 continue
             problems = validate_service(service)
@@ -395,7 +405,7 @@ def main(argv: list[str] | None = None) -> int:
                         "classification": status,
                         "issues": problems,
                         "runtime": {"status": "NOT_CHECKED"},
-                        "release_management": service.get("release_management"),
+                        "release_management": public_release_management(service),
                         "proposed_target": None,
                     })
             else:
