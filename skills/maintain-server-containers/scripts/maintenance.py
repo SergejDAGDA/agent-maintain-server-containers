@@ -106,12 +106,14 @@ def validate_service(service: dict) -> list[str]:
     policy = service.get("policy")
     owner = service.get("ownership")
     issues: list[str] = []
-    if policy in {"MANUAL", "NO_TOUCH"}:
+    if isinstance(policy, str) and policy in {"MANUAL", "NO_TOUCH"}:
         return issues
-    if owner in {"external_admin", "unknown"}:
+    if isinstance(owner, str) and owner in {"external_admin", "unknown"}:
         issues.append("ownership not eligible for automated maintenance")
     state = service.get("state", {})
-    if not isinstance(state, dict) or state.get("complete") is not True:
+    if not isinstance(state, dict):
+        state = {}
+    if state.get("complete") is not True:
         issues.append("state contract not proven complete")
     for key in ("binds", "volumes", "databases", "user_files", "secret_refs"):
         if not isinstance(state.get(key), list):
@@ -136,7 +138,9 @@ def validate_service(service: dict) -> list[str]:
         ):
             issues.append("explicit immutable pin target missing")
     rollback = service.get("rollback", {})
-    if not isinstance(rollback, dict) or rollback.get("class") not in (
+    if not isinstance(rollback, dict):
+        rollback = {}
+    if rollback.get("class") not in (
         "image_only", "state_restore_required", "unknown"
     ):
         issues.append("rollback classification missing")
@@ -149,7 +153,9 @@ def validate_service(service: dict) -> list[str]:
     if not isinstance(service.get("smoke"), dict):
         issues.append("smoke profile contract missing")
     backup = service.get("backup", {})
-    if not isinstance(backup, dict) or not isinstance(backup.get("required"), bool):
+    if not isinstance(backup, dict):
+        backup = {}
+    if type(backup.get("required")) is not bool:
         issues.append("backup requirement not declared")
     if policy == "AUTO_GATED" and backup.get("required") is not True:
         issues.append("AUTO_GATED requires backup gate")
