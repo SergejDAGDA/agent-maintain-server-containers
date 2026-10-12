@@ -252,6 +252,50 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         data = load_policy(args.policy)
+        if data.get("schema") == "sandbox-server-maintenance/v1":
+            from native_policy import structure, assess_native
+            services, errors, warnings = structure(data)
+            if args.runtime_json:
+                raise PolicyError("native policy adapter does not accept synthetic runtime evidence")
+            if args.operation == "validate":
+                result = {
+                    "schema": "sandbox-server-maintenance/v1",
+                    "services": len(services),
+                    "valid": not errors,
+                    "errors": errors,
+                    "warnings": warnings,
+                    "note": "Structural compatibility is not authorization or proof of recovery."
+                }
+            else:
+                records = assess_native(data, services, live=args.live)
+                result = {
+                    "operation": args.operation,
+                    "read_only": True,
+                    "schema": "sandbox-server-maintenance/v1",
+                    "policy_valid": not errors,
+                    "errors": errors,
+                    "warnings": warnings,
+                    "services": records,
+                    "note": "All candidates remain gated until release, backup and recovery evidence is verified."
+                }
+            if args.format == "json":
+                print(json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True))
+            else:
+                for error in errors:
+                    print(f"ERROR: {error}")
+                if args.operation == "validate":
+                    print(f"Native policy structural validation: {'PASS' if not errors else 'FAIL'} "
+                          f"({len(services)} services)")
+                else:
+                    for record in result["services"]:
+                        print(f"{record['name']}: {record['classification']} "
+                              f"[{record['policy']}]")
+                        for issue in record["issues"]:
+                            print(f"  - {issue}")
+                    print("READ-ONLY. No changes made.")
+                for warning in warnings:
+                    print(f"NOTE: {warning}")
+            return 2 if errors else 0
         services, errors = normalize(data)
         if args.live and args.runtime_json:
             raise PolicyError("--live and --runtime-json cannot be combined")
