@@ -3,6 +3,8 @@
 
 ## 0.2.0 - Unreleased
 
+- Withhold unsupported service security-invariant values from all read-only CLI diagnostics; cover text and JSON reports for malformed untrusted values.
+
 - Require exact claim coverage for every phase-specific service adapter result; omitted checks and unrelated passing checks fail closed.
 
 - Add `deploy-project <project> [release-id]` as an agent-operated,
