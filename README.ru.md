@@ -163,7 +163,7 @@ $maintain-server-containers deploy-project local-editor
 
 Схема v1 задаёт имена Compose-сервисов, владельца, текущий и целевой image, пользовательское состояние, необходимость backup, правила отката, health и smoke-тесты.
 
-Подробности в [описании схемы](skills/maintain-server-containers/references/policy-schema.md). Если проект уже использует свой вариант `services.yaml`, его совместимость необходимо отдельно проверить, а не предполагать по имени файла.
+Подробности в [описании схемы](skills/maintain-server-containers/references/policy-schema.md). Если проект уже использует свой вариант `services.yaml`, его совместимость необходимо отдельно проверить, а не предполагать по имени файла. Для дополнительных правил безопасности предусмотрен [контракт доверенного адаптера](skills/maintain-server-containers/references/safety-adapter.md). Без зарегистрированного адаптера CLI отклоняет неизвестные правила; YAML не может сам загружать Python-код.
 
 
 ### Названия компонентов в группах зависимостей
