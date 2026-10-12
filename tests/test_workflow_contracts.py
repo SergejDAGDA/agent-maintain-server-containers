@@ -28,7 +28,7 @@ class DeploymentWorkflowTest(unittest.TestCase):
         text = (SKILL / "references" / "repository-deployment.md").read_text(encoding="utf-8")
         for required in (
             "Docker socket", "untrusted", "public exposure",
-            "existing user data", "MANUAL", "no pre-existing application user data",
+            "existing application data", "MANUAL", "no pre-existing application user data",
             "bounded first installation",
         ):
             with self.subTest(required=required):
