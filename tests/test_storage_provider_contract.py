@@ -136,6 +136,10 @@ class StorageProviderContractTests(unittest.TestCase):
         self.options["expected_provider_fingerprint"] = SHA_B
         self.blocked("storage:provider_pin_mismatch")
 
+    def test_checkpoint_provider_engine_mismatch_denied(self):
+        self.checkpoint["provider"] = "kopia"
+        self.blocked("storage:checkpoint_provider_mismatch")
+
     def test_source_digest_drift_denied(self):
         self.observation["compose_source_digest"] = SHA_B
         self.blocked("storage:observation_source_mismatch")
