@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "maintain-server-containers",
-  "version": "0.1.0",
-  "description": "Portable, policy-driven Docker Compose maintenance skill with read-only audit and planning, state preservation and controlled update runbooks.",
+  "version": "0.2.0",
+  "description": "Portable policy-driven Docker Compose maintenance, safe read-only audits, and targeted deployment workflows for approved project-owned releases.",
   "author": {
     "name": "Sergej DAGDA",
     "url": "https://github.com/SergejDAGDA"
@@ -33,7 +33,9 @@
     "defaultPrompt": [
       "Audit my Compose server without changing its state.",
       "Plan available container updates and tell me which are safe.",
-      "Update eligible AUTO_SAFE services under the current project's maintenance policy while preserving data."
-    ]
+      "Update eligible AUTO_SAFE services under the current project's maintenance policy while preserving data.",
+      "Deploy the latest approved release of my project-managed application, verify persistent state and update project memory after success."
+    ],
+    "longDescription": "Audit and plan container maintenance; deploy explicitly approved application-project builds under a bounded, state-preserving workstream and synchronize verified deployment records and project memory."
   }
 }
