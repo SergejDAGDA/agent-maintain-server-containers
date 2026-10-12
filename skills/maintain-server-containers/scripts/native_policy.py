@@ -168,6 +168,8 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             continue
         seen.add(name)
         services.append(service)
+        from release_management import validate_release_management
+        errors.extend(validate_release_management(service, class_field="policy_class"))
         cls = service.get("policy_class")
         owner = service.get("ownership")
         if cls not in POLICIES:
@@ -348,5 +350,6 @@ def assess_native(policy: dict, services: list[dict], *, live: bool = False) -> 
             "issues": issues,
             "runtime": observed,
             "target_candidate": service.get("version_policy", {}).get("target_candidate"),
+            "release_management": service.get("release_management"),
         })
     return results
