@@ -15,7 +15,6 @@ services:
       - /var/lib/postgresql/data:uid=999,gid=999,mode=1777
       - /var/run/postgresql:uid=999,gid=999,mode=0770
       - /tmp:uid=999,gid=999,mode=1777
-    network_mode: null
     networks: [isolated]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
