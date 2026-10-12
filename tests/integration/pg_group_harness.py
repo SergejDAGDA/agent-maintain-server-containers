@@ -52,6 +52,10 @@ from witness_attestation_contract import (  # noqa: E402
     CLAIM, SCHEMA, DurableWitnessLedger, TrustedWitness, WitnessTrustStore,
     canonical_statement, verify_and_record,
 )
+from ledger_continuity_contract import (  # noqa: E402
+    CLAIM as ANCHOR_CLAIM, SCHEMA as ANCHOR_SCHEMA,
+    canonical_anchor, read_ledger_state, verify_ledger_continuity,
+)
 from ci_pg_inspector import SyntheticPgReadOnlyInspector  # noqa: E402
 from trusted_inspector_registry import (  # noqa: E402
     ReviewedInspector, ReviewedInspectorRegistry,
@@ -647,12 +651,92 @@ def run() -> None:
             )
             if (duplicate.status != "BLOCKED" or "witness:replayed" not in duplicate.blockers):
                 raise RuntimeError("durable SQLite replay guard failed on reconnect")
+            # Snapshot of the pre-revocation CI ledger, created solely via
+            # sqlite3 backup into a new, sandbox-owned synthetic file.
+            old_ledger_path = sandbox / "synthetic-rolled-back-ledger.sqlite"
+            old_connection = sqlite3.connect(old_ledger_path)
+            try:
+                ledger_connection.backup(old_connection)
+            finally:
+                old_connection.close()
             if not restarted.revoke("key", "synthetic-ci-witness:ci-ephemeral-key"):
                 raise RuntimeError("synthetic witness revocation not recorded")
             if restarted.is_current(signed.attestation_id, now_unix=int(time.time())):
                 raise RuntimeError("synthetic revoked attestation remains active")
         finally:
             ledger_connection.close()
+        # H27: the signed high-watermark is *independently supplied* to the
+        # verifier as an exact hash in this disposable exercise. No real
+        # remote protected anchor service exists or is claimed.
+        anchor_key = Ed25519PrivateKey.generate()
+        anchor_trust = WitnessTrustStore((TrustedWitness(
+            witness_id="synthetic-anchor-signer",
+            key_id="synthetic-anchor-key",
+            public_key=anchor_key.public_key().public_bytes(
+                Encoding.Raw, PublicFormat.Raw),
+            fault_domain="ci-simulated-anchor-domain",
+        ),))
+        def make_anchor(state, nonce):
+            statement = {
+                "schema": ANCHOR_SCHEMA, "claim": ANCHOR_CLAIM,
+                "ledger_id": "ci-witness-ledger",
+                "witness_id": "synthetic-anchor-signer",
+                "key_id": "synthetic-anchor-key",
+                "witness_fault_domain": "ci-simulated-anchor-domain",
+                "nonce": nonce,
+                "state_digest": state.digest,
+                "used_count": state.used_count,
+                "revoked_count": state.revoked_count,
+                "revision": state.used_count + state.revoked_count,
+                "issued_at_unix": int(time.time()),
+                "expires_at_unix": int(time.time()) + 240,
+            }
+            raw = canonical_anchor(statement)
+            return ({"statement": statement, "signature": anchor_key.sign(raw).hex()},
+                    hashlib.sha256(raw).hexdigest())
+
+        with sqlite3.connect(ledger_path) as current_ledger:
+            current_state = read_ledger_state(current_ledger)
+            if not current_state.valid or current_state.revoked_count != 1:
+                raise RuntimeError("synthetic revocation state not readable")
+            anchor_envelope, current_anchor_id = make_anchor(
+                current_state, secrets.token_hex(32))
+            latest = verify_ledger_continuity(
+                current_ledger, anchor_envelope, anchor_trust,
+                ledger_id="ci-witness-ledger",
+                expected_current_anchor_id=current_anchor_id,
+                now_unix=int(time.time()),
+            )
+            if (latest.status != "CRYPTO_MATCHED" or latest.restore_authorized
+                    or latest.off_host_proven):
+                raise RuntimeError("synthetic current ledger anchor not verified")
+
+        with sqlite3.connect(old_ledger_path) as old_ledger:
+            old_state = read_ledger_state(old_ledger)
+            if not old_state.valid or old_state.revoked_count != 0:
+                raise RuntimeError("synthetic pre-revocation ledger missing")
+            rollback = verify_ledger_continuity(
+                old_ledger, anchor_envelope, anchor_trust,
+                ledger_id="ci-witness-ledger",
+                expected_current_anchor_id=current_anchor_id,
+                now_unix=int(time.time()),
+            )
+            if (rollback.status != "BLOCKED" or
+                    "continuity:ledger_state_mismatch" not in rollback.blockers):
+                raise RuntimeError("synthetic SQLite rollback was accepted")
+            historic_envelope, _historic_id = make_anchor(
+                old_state, secrets.token_hex(32))
+            historic = verify_ledger_continuity(
+                old_ledger, historic_envelope, anchor_trust,
+                ledger_id="ci-witness-ledger",
+                expected_current_anchor_id=current_anchor_id,
+                now_unix=int(time.time()),
+            )
+            if (historic.status != "BLOCKED" or
+                    "continuity:not_latest_external_anchor" not in historic.blockers):
+                raise RuntimeError("stale signed anchor accepted after rollback")
+        print("H27 PASS externally pinned synthetic ledger anchor rejects "
+              "pre-revocation SQLite rollback and old signed anchor", flush=True)
         # Independent domain labels here are synthetic assertions only.
         # The actual same-runner Restic remains BLOCKED by H24 and H25.
         print("H26 PASS synthetic Ed25519 signature, persisted SQLite anti-replay "
