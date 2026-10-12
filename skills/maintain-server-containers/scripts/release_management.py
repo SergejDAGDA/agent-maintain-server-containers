@@ -5,7 +5,7 @@ These fields route agent workflows; they never authorize Docker mutation.
 from __future__ import annotations
 
 STRATEGIES = {"upstream_managed", "project_managed", "externally_managed"}
-AUTHORITIES = {"application_project", "deployment_project", "external_admin"}
+AUTHORITIES = {"upstream_project", "application_project", "deployment_project", "external_admin"}
 
 
 def validate_release_management(service: dict, *, class_field: str) -> list[str]:
@@ -37,7 +37,7 @@ def validate_release_management(service: dict, *, class_field: str) -> list[str]
             errors.append(f"{name}: project_managed cannot enter update-auto")
         if cls not in {"MANUAL", "NO_TOUCH"}:
             errors.append(f"{name}: project_managed requires MANUAL or NO_TOUCH policy")
-        if authority == "external_admin":
+        if authority in ("external_admin", "upstream_project"):
             errors.append(f"{name}: project_managed release requires an application/deployment owner")
     if strategy == "externally_managed" and cfg.get("automatic_updates") is not False:
         errors.append(f"{name}: externally_managed cannot enter update-auto")
