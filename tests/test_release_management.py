@@ -61,6 +61,14 @@ class ReleaseManagementTest(unittest.TestCase):
         self.assertTrue(any("unsupported" in x for x in issues))
         self.assertTrue(any("missing" in x for x in issues))
 
+    def test_upstream_release_source_cannot_be_project_owned(self):
+        cfg = deepcopy(CONFIG)
+        cfg["release_authority"] = "upstream_project"
+        issues = validate_release_management(
+            {"name": "private-app", "policy": "MANUAL", "release_management": cfg},
+            class_field="policy")
+        self.assertTrue(any("application/deployment owner" in x for x in issues))
+
     def test_external_admin_is_not_app_owner(self):
         cfg = deepcopy(CONFIG)
         cfg["release_authority"] = "external_admin"
