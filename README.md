@@ -221,6 +221,10 @@ Do not store secrets, internal inventory, hostnames, tokens, user files or priva
 
 The next version can add a tested executor with explicit adapter contracts and disposable Docker integration tests. We intentionally do not describe that future capability as implemented today.
 
+## Future lifecycle and recovery design
+
+The proposals in [the development roadmap](docs/ROADMAP.md), [lifecycle/recovery contract](docs/LIFECYCLE-RECOVERY-DESIGN.md), and [disposable test-harness specification](docs/DISPOSABLE-TEST-HARNESS.md) describe future work: typed state and evidence, event-linked backups, isolated restore tests, bounded execution and safe decommission. **These are design documents, not features included in v0.2.0.** The read-only CLI and existing safety gates remain unchanged.
+
 ## Development
 
 ```sh
