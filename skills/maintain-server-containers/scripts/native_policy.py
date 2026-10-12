@@ -115,7 +115,7 @@ def resolve_group(group_name: str, group: dict, services: list[dict]) -> tuple[l
     return list({item["name"]: item for item in resolved}.values()), problems
 
 
-def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
+def structure(policy: dict, *, trusted_adapters: dict | None = None) -> tuple[list[dict], list[str], list[str]]:
     """Validate structural shape. Return service records, fatal errors and warnings.
 
     Compatibility does not mean that an update is authorized.
@@ -154,10 +154,10 @@ def structure(policy: dict) -> tuple[list[dict], list[str], list[str]]:
             "external_or_unknown_ownership": "never_automatic",
             "security_release_gate_bypass": "prohibited",
         }
-        for key in invariants.keys() - required.keys():
-            # Identifiers as well as values are untrusted. Never echo a
-            # secret-bearing or identifying arbitrary policy key.
-            errors.append("unsupported global safety invariant (identifier withheld)")
+        from safety_adapter import validate_adapter_claims
+        errors.extend(validate_adapter_claims(
+            policy, frozenset(required), registry=trusted_adapters
+        ))
         for key, expected in required.items():
             if invariants.get(key) != expected or type(invariants.get(key)) is not type(expected):
                 errors.append(f"required safety invariant missing or changed: {key}")
