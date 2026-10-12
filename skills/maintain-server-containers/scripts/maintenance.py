@@ -268,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
                     "note": "Structural compatibility is not authorization or proof of recovery."
                 }
             else:
-                records = assess_native(data, services, live=args.live)
+                records = [] if errors else assess_native(data, services, live=args.live)
                 result = {
                     "operation": args.operation,
                     "read_only": True,
