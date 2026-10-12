@@ -102,22 +102,30 @@ def validate_rendered_compose(project: str, state: Path, env: dict) -> None:
     volumes = service.get("volumes", [])
     targets = {(v.get("source"), v.get("target")) for v in volumes}
     approved = {(str(state), "/state"), (str(APP), "/fixture/app.py")}
-    if (service.get("image") != IMAGE
-            or service.get("network_mode") != "none"
-            or service.get("read_only") is not True
-            or service.get("user") != "65534:65534"
-            or service.get("privileged", False)
-            or set(service.get("cap_drop", [])) != {"ALL"}
-            or service.get("labels", {}).get(LABEL) != "true"
-            or targets != approved or len(volumes) != 2
-            or any(v.get("type") != "bind" or v.get("read_only") is not True
-                   or v.get("bind", {}).get("create_host_path") is not False
-                   for v in volumes)
-            or any(key in service for key in (
-                "build", "ports", "secrets", "devices", "env_file", "pid", "network",
-                "extra_hosts", "group_add"
-            ))):
-        raise RuntimeError("REFUSED: rendered fixture Compose exceeds isolation contract")
+    # Report only allowlisted preflight rule identifiers (no raw Compose,
+    # environment, paths or secret-bearing Docker output).
+    rules = {
+        "image_pin": service.get("image") == IMAGE,
+        "network_isolation": service.get("network_mode") == "none",
+        "read_only_root": service.get("read_only") is True,
+        "unprivileged_user": service.get("user") == "65534:65534",
+        "no_privilege": not service.get("privileged", False),
+        "capabilities_dropped": set(service.get("cap_drop", [])) == {"ALL"},
+        "fixture_owner_label": service.get("labels", {}).get(LABEL) == "true",
+        "exact_bind_paths": targets == approved and len(volumes) == 2,
+        "read_only_binds": all(
+            v.get("type") == "bind" and v.get("read_only") is True
+            and v.get("bind", {}).get("create_host_path") is False
+            for v in volumes
+        ),
+        "no_unsafe_options": not any(key in service for key in (
+            "build", "ports", "secrets", "devices", "env_file", "pid", "network",
+            "extra_hosts", "group_add"
+        )),
+    }
+    denied = [key for key, passed in rules.items() if not passed]
+    if denied:
+        raise RuntimeError("REFUSED: Compose isolation contract: " + ", ".join(denied))
 
 
 def start_fixture(project: str, state: Path) -> None:
