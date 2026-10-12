@@ -3,6 +3,8 @@
 
 ## 0.2.0 - Unreleased
 
+- Require exact claim coverage for every phase-specific service adapter result; omitted checks and unrelated passing checks fail closed.
+
 - Add `deploy-project <project> [release-id]` as an agent-operated,
   explicitly authorized project-owned release deployment workflow.
 - Support local/private application release authority independent of
