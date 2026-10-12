@@ -87,6 +87,7 @@ class WitnessTrustStore:
 
 def _identifier(value: Any) -> bool:
     return (isinstance(value, str)
+            and ":" not in value
             and value.lower() not in {"unknown", "none", "missing", "unresolved"}
             and bool(IDENTIFIER.fullmatch(value)))
 
@@ -182,10 +183,16 @@ class DurableWitnessLedger:
             db.commit()
             return "recorded"
         except sqlite3.IntegrityError:
-            db.rollback()
+            try:
+                db.rollback()
+            except sqlite3.Error:
+                return "unavailable"
             return "replayed"
         except sqlite3.Error:
-            db.rollback()
+            try:
+                db.rollback()
+            except sqlite3.Error:
+                pass
             return "unavailable"
 
     def revoke(self, kind: str, target: str) -> bool:
