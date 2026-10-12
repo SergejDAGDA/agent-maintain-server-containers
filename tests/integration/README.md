@@ -33,6 +33,18 @@ python -B -m unittest discover -s tests -p test_integration_contract.py -v
 
 The normal read-only CLI and regular suite remain untouched; all fixtures use invented identities and data.
 
+## Provider-backed Restic proof (H16/H17/H18)
+
+The CI harness also installs the distribution-packaged Restic CLI **only** on its hosted Linux runner. It creates a fresh encrypted repository under the same run-owned temporary sandbox, with a random synthetic password file (mode 0600) that is never printed or included in backups.
+
+- **H16:** first prepare an application-consistent synthetic recovery set with SQLite's backup API, then use Restic `backup --json`; demand the full immutable snapshot ID and run `check --read-data`.
+- **H17:** restore **that exact ID**, never `latest`, into a new tree; verify the checkpoint manifest and the SQLite/attachment links; boot a *separate* disposable Compose app from that restored data and demand a passing health check.
+- **H18:** verify that a deliberately incorrect test password cannot list snapshots; recheck that the known-good snapshot is still readable. No `forget`, `prune`, `unlock` or `repair` is exposed by the fixture Restic wrapper.
+
+The test-only provider source is `restic_fixture.py`. Its allowed command surface is explicitly restricted, it never inherits Restic/cloud credentials and it redacts command failures. Offline refusal tests live in `tests/test_restic_fixture_contract.py`. The provider comparison/decision is [ADR-001](../../docs/ADR-001-DISPOSABLE-RESTIC.md).
+
+An encrypted Restic snapshot and repository `check` are **not** proof that a live database can be recovered without application-coherent capture; only the separate restore + application smoke earns synthetic `RESTORE_TESTED` evidence.
+
 ## What this does NOT establish
 
 - No real backup provider, encryption, off-host recovery or production restore exists here.

@@ -19,6 +19,7 @@ from pathlib import Path
 
 from fixture_app import verify_state
 from fixture_backup import capture_fixture, restore_fixture, seed_fixture, verify_checkpoint
+from restic_fixture import ResticFixture, TEST_MARKER
 
 HERE = Path(__file__).resolve().parent
 COMPOSE = HERE / "fixture.compose.yaml"
@@ -174,10 +175,13 @@ def run_harness() -> None:
     suffix = secrets.token_hex(6)
     original_project = "msc-fixture-original-" + suffix
     restored_project = "msc-fixture-restored-" + suffix
+    restic_project = "msc-fixture-restic-" + suffix
     original = sandbox / "original"
     restored = sandbox / "restored"
     good = sandbox / "checkpoints" / "known-good"
     corrupted = sandbox / "checkpoints" / "damaged"
+    restic_source = sandbox / "source-checkpoint"
+    restic_restored = sandbox / "restic-restored"
     fatal: Exception | None = None
     try:
         seed = seed_fixture(original)
@@ -210,6 +214,27 @@ def run_harness() -> None:
             raise RuntimeError("failed restore created visible target")
         if verify_checkpoint(good) != seed:
             raise RuntimeError("known-good checkpoint damaged during negative test")
+        # Exercise an actual encrypted Restic repository against the same
+        # synthetic data after application-consistent SQLite backup capture.
+        marker = sandbox / ".msc-restic-ci-only"
+        marker.write_text(TEST_MARKER + "\n", encoding="ascii")
+        restic = ResticFixture(sandbox)
+        restic.initialize()
+        if capture_fixture(original, restic_source) != seed:
+            raise RuntimeError("synthetic Restic source does not match original")
+        snapshot_id = restic.capture(restic_source)
+        evidence = restic.restore_and_verify(snapshot_id, staged_checkpoint=restic_source,
+                                             restored_state=restic_restored)
+        if not evidence.repository_checked or not evidence.restore_tested:
+            raise RuntimeError("Restic recovery evidence incomplete")
+        start_fixture(restic_project, restic_restored)
+        if verify_state(restic_restored) != seed:
+            raise RuntimeError("Restic-restored fixture health differs")
+        restic.reject_incorrect_password()
+        restic.check_snapshot(snapshot_id, staged_checkpoint=restic_source)
+        print("H16 PASS encrypted Restic snapshot and repository data check", flush=True)
+        print("H17 PASS exact Restic snapshot restored and Compose smoke healthy", flush=True)
+        print("H18 PASS invalid Restic key refused; known-good retained", flush=True)
         print("H01 PASS synthetic isolated Compose app", flush=True)
         print("H03 PASS SQLite + attachments restored and healthy in separate project", flush=True)
         print("H08 PASS damaged snapshot refused, known-good intact", flush=True)
@@ -218,7 +243,8 @@ def run_harness() -> None:
     finally:
         # All cleanup targets were uniquely generated on this CI run. NEVER
         # docker system prune, docker volume prune or generic down -v.
-        for project, state in ((restored_project, restored), (original_project, original)):
+        for project, state in ((restic_project, restic_restored),
+                               (restored_project, restored), (original_project, original)):
             try:
                 teardown_fixture(project, state)
             except Exception as error:
