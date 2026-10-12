@@ -55,7 +55,7 @@ def validate_adapter_claims(
     manifest = policy.get("safety_adapter")
     if manifest is None:
         if extras:
-            issues.append("unknown global safety invariants require a trusted, pinned safety adapter")
+            issues.append("unsupported global safety invariant: trusted, pinned safety adapter required (identifier withheld)")
         return issues
     if not isinstance(manifest, dict) or set(manifest) != MANIFEST_KEYS:
         return ["safety_adapter manifest fields invalid (values withheld)"]
@@ -92,7 +92,7 @@ def validate_adapter_claims(
     if not isinstance(result, dict) or set(result) != extras:
         return ["trusted safety adapter results incomplete or unexpected"]
     for key, status in result.items():
-        if status not in STATUSES:
+        if not isinstance(status, str) or status not in STATUSES:
             return ["trusted safety adapter returned invalid result"]
         if status != "PASS":
             issues.append("trusted safety adapter has non-passing global invariant")
@@ -117,7 +117,7 @@ def validate_adapter_service(
     if not isinstance(results, dict) or not results:
         return ["trusted safety adapter service results missing"]
     if any(not isinstance(k, str) or not IDENTITY.fullmatch(k)
-           or v not in STATUSES for k, v in results.items()):
+           or not isinstance(v, str) or v not in STATUSES for k, v in results.items()):
         return ["trusted safety adapter service results malformed"]
     return [] if all(v == "PASS" for v in results.values()) else [
         "trusted safety adapter service check did not pass"
