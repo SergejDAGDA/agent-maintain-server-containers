@@ -31,6 +31,8 @@ The aim is to make repeatable, understandable maintenance possible with **one bo
 
 The read-only helper deliberately does not pull images, change deployment files or recreate containers.
 
+**Extended-policy compatibility:** in addition to the portable `schema_version: "1"` format, the bundled CLI recognizes namespaced `<project>-maintenance/v1` policies with `policy_class`, `identity.compose_services`, `state_contract.completeness` and dependency groups. The adapter preserves this richer source structure and never rewrites a project's policy. See [synthetic extended example](examples/native-policy.yaml). This is format compatibility, not an automatic approval to update.
+
 ## Quick start
 
 ### Install as an Agent Skill
@@ -55,13 +57,14 @@ Python 3.10+ and PyYAML for YAML policies:
 python -m pip install -r skills/maintain-server-containers/scripts/requirements.txt
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml validate
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml plan
+python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml validate
 ```
 
 Read-only live metadata inspection:
 
 ```sh
 python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live audit
-python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live status --format json
+python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml --live --format json status
 ```
 
 Note: options such as `--format` are top-level arguments and must appear before the operation name.
