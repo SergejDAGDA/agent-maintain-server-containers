@@ -14,7 +14,7 @@ services:
       current: example.invalid/isolated/app:1.2.3
     release_management:
       strategy: upstream_managed
-      release_authority: deployment_project
+      release_authority: upstream_project
       version_monitoring: true
       automatic_updates: false
     state:
