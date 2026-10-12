@@ -157,3 +157,33 @@ atomic live database-plus-file capture with concurrent writes, a trusted
 attestation engine, a production provider or an authorized Docker executor.
 Production migration, rollback, backup scheduling and deletion remain
 separately gated.
+
+## Failure-domain declaration and source-loss fault injection (H22/H23)
+
+`failure_domain_contract.py` is an experimental, strictly pure/read-only
+**declaration gate**. It compares the exact recovery-set fingerprint,
+restore-tested checkpoint and immutable snapshot ID with declared source,
+repository and independent key-authority fault domains. Unresolved identities,
+shared failure domains, on-host repositories, missing key or snapshot access,
+repository outages, stale evidence, and incomplete restore tests are
+`BLOCKED`. Even a fully populated off-host topology declaration returns only
+`CANDIDATE_ONLY`, never independent proof or permission to restore. Untrusted
+booleans or source-controlled assertions cannot establish a real off-host
+recovery guarantee.
+
+H22 in the disposable F2 test shuts down the **synthetic** primary Compose
+project, destroys its tmpfs PostgreSQL database and removes its artificial
+three-file source plus original staging checkpoint. The pre-existing encrypted
+local Restic repository is then used to recreate the full two-service group
+and verify database/file application smoke. H23 temporarily removes access to
+the synthetic Restic key and repository, verifying refusal and subsequent
+availability of the *same* immutable snapshot. The loss simulation is bounded
+to unique GitHub-hosted CI test directories and fixture-owned containers.
+No production or user backup is involved.
+
+**Important:** The local Restic repository and temporary key still share
+the original GitHub runner fault domain. Accordingly, the new contract
+**must report off-host disaster recovery as BLOCKED** even though the
+synthetic application successfully reconstitutes on the same runner.
+Actual independent fault-domain delivery, key escrow, disaster-region
+availability and independently witnessed restore remain unimplemented.
