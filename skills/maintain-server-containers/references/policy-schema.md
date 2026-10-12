@@ -114,7 +114,7 @@ release_management:
 
 The same `release_management` fields are understood by portable and extended
 policies. Accepted strategies: `upstream_managed`, `project_managed`, and
-`externally_managed`. Accepted release authorities: `application_project`,
+`externally_managed`. Accepted release authorities: `upstream_project`, `application_project`,
 `deployment_project`, and `external_admin`.
 
 A `project_managed` service requires `MANUAL` or `NO_TOUCH`, must set
