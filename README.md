@@ -10,7 +10,7 @@ Installed skill name: `maintain-server-containers`
 
 Invocation: `$maintain-server-containers`
 
-**Status: v0.2.0 release candidate (proposed).** The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
+**Status: v0.2.0 draft release candidate (not merged or installed).** The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
 ## Why
 
@@ -208,7 +208,7 @@ Do not store secrets, internal inventory, hostnames, tokens, user files or priva
 
 ## Current capability boundary
 
-| Capability | v0.1.0 |
+| Capability | v0.2.0 candidate |
 | --- | --- |
 | Policy schema validation | Implemented |
 | Read-only Compose container identity check | Implemented |
