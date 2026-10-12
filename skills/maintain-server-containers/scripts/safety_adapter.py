@@ -116,9 +116,18 @@ def validate_adapter_service(
         return ["trusted safety adapter service validator failed (details withheld)"]
     if not isinstance(results, dict) or not results:
         return ["trusted safety adapter service results missing"]
+    if (not isinstance(adapter.claims, frozenset)
+            or not adapter.claims
+            or any(not isinstance(k, str) or not IDENTITY.fullmatch(k)
+                   for k in adapter.claims)):
+        return ["trusted safety adapter service claims invalid"]
     if any(not isinstance(k, str) or not IDENTITY.fullmatch(k)
            or not isinstance(v, str) or v not in STATUSES for k, v in results.items()):
         return ["trusted safety adapter service results malformed"]
+    # Every claimed rule must have a result for *this* service and phase.
+    # An unrelated passing rule cannot disguise an omitted safety check.
+    if set(results) != adapter.claims:
+        return ["trusted safety adapter service result claim coverage mismatch"]
     return [] if all(v == "PASS" for v in results.values()) else [
         "trusted safety adapter service check did not pass"
     ]
