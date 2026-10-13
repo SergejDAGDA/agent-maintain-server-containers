@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — initial real-world acceptance improvements
+
+- Add a stdlib-only, noninstalling `doctor.py` to verify the exact
+  interpreter can run the YAML validator; require a local reviewed venv
+  rather than installing PyYAML on the inspected server.
+- Add a read-only Compose source preflight for explicit ordered file sets,
+  with opt-in quiet render and redacted failures. Distinguish local source
+  reproducibility from remote runtime identity and change authorization.
+- Require agent audits to reconcile unmanaged/unlabelled containers, whole
+  dependency-group image identities, cross-project coupling and missing
+  source/env; keep external-admin systems NO_TOUCH with feedback only.
+- Add offline regression tests. No automatic update or server change,
+  and no new release/version bump.
+
 ## 0.3.0 - 2026-10-13
 
 - **Portable policy hardening:** undeclared portable v1 root/service/section keys now fail closed rather than silently implying support for project-specific safety or approval rules. Verify and explicitly map custom policy extensions before upgrading the installed skill.
