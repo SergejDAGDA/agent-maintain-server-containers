@@ -57,6 +57,10 @@ from ledger_continuity_contract import (  # noqa: E402
     canonical_anchor, read_ledger_state, verify_ledger_continuity,
 )
 from ci_pg_inspector import SyntheticPgReadOnlyInspector  # noqa: E402
+from ci_anchor_head import SyntheticCiHeadSource  # noqa: E402
+from current_anchor_source_contract import (  # noqa: E402
+    ReviewedHeadReader, ReviewedHeadSource,
+)
 from trusted_inspector_registry import (  # noqa: E402
     ReviewedInspector, ReviewedInspectorRegistry,
 )
@@ -735,6 +739,52 @@ def run() -> None:
             if (historic.status != "BLOCKED" or
                     "continuity:not_latest_external_anchor" not in historic.blockers):
                 raise RuntimeError("stale signed anchor accepted after rollback")
+        # H28: use a reviewed in-process synthetic responder (not a real
+        # protected remote authority). The caller independently constructs
+        # the registered object and supplies a synthetic minimum revision.
+        head_private_key = Ed25519PrivateKey.generate()
+        responder = SyntheticCiHeadSource(
+            head_private_key, anchor_id=current_anchor_id,
+            revision=current_state.used_count + current_state.revoked_count,
+        )
+        head_reader = ReviewedHeadReader(HERE, ReviewedHeadSource(
+            source_id="ci-registered-head", key_id="ci-head-key",
+            fault_domain="ci-simulated-head-domain",
+            public_key=head_private_key.public_key().public_bytes(
+                Encoding.Raw, PublicFormat.Raw),
+            source_file_sha256="sha256:" + _sha_file(HERE / "ci_anchor_head.py"),
+            source=responder,
+        ))
+        def evaluate_head(connection):
+            return head_reader.evaluate(
+                connection, anchor_envelope, anchor_trust,
+                ledger_id="ci-witness-ledger", now_unix=int(time.time()),
+                trusted_min_revision=current_state.used_count +
+                                     current_state.revoked_count,
+            )
+
+        with sqlite3.connect(ledger_path) as current_ledger:
+            matched = evaluate_head(current_ledger)
+            if (matched.status != "SIGNED_SOURCE_CLAIM_MATCHED"
+                    or matched.restore_authorized or matched.off_host_proven):
+                raise RuntimeError("synthetic current anchor head verification failed")
+            responder.available = False
+            outage = evaluate_head(current_ledger)
+            if outage.status != "BLOCKED" or "head:source_unavailable" not in outage.blockers:
+                raise RuntimeError("synthetic head-source outage not refused")
+            responder.available = True
+            responder.replay = True
+            replay = evaluate_head(current_ledger)
+            if replay.status != "BLOCKED" or "head:challenge_mismatch" not in replay.blockers:
+                raise RuntimeError("synthetic head-source reply replay not refused")
+            responder.replay = False
+        with sqlite3.connect(old_ledger_path) as rolled_back:
+            old_db = evaluate_head(rolled_back)
+            if (old_db.status != "BLOCKED"
+                    or "continuity:ledger_state_mismatch" not in old_db.blockers):
+                raise RuntimeError("synthetic head reader accepted rolled-back SQLite")
+        print("H28 PASS signed reviewed head-source challenge, outage/replay refusal, "
+              "and rollback guard; no live independent authority", flush=True)
         print("H27 PASS externally pinned synthetic ledger anchor rejects "
               "pre-revocation SQLite rollback and old signed anchor", flush=True)
         # Independent domain labels here are synthetic assertions only.
