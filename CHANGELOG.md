@@ -1,23 +1,14 @@
 # Changelog
 
-## Unreleased — post-audit source hardening (PR #22)
+## 0.3.0 - 2026-10-13
 
-- Fail closed when portable v1 policy contains undeclared top-level, service or
-  documented-section fields; withhold unknown keys and values from diagnostics.
-  Existing documented portable examples remain valid. Consuming projects with
-  bespoke safety fields need an explicit migration or reviewed native adapter.
-- Reject nonmapping synthetic runtime evidence rather than raising an
-  unhandled exception; direct assessment also reports malformed runtime data
-  as unverified.
-- Require an actual integer `policy_revision` in namespaced native policies,
-  preventing Python boolean `True` from being accepted as revision `1`.
-- Limit portable read-only Docker inspect to selected container identity,
-  image, running/health and minimal mount attributes, not the full inspect
-  record.
-- Add negative regressions and English/Russian capability-boundary guidance.
-- No production Docker executor or independently protected backup service.
-  No published version bump or installed skill upgrade is implied.
-
+- **Portable policy hardening:** undeclared portable v1 root/service/section keys now fail closed rather than silently implying support for project-specific safety or approval rules. Verify and explicitly map custom policy extensions before upgrading the installed skill.
+- **Strict runtime evidence:** reject malformed synthetic runtime payloads and boolean native policy revisions; portable read-only Docker inspect now requests selected identity, image, health and mount attributes rather than full inspect metadata.
+- **Experimental recovery-contract research:** provider-neutral recovery descriptors, exact Restic snapshot IDs, source-pinned read-only inspectors, signature verification, persisted replay/revocation guards, pinned ledger continuity and local atomic CAS. All are non-authorizing research contracts, **not independent off-host proof**.
+- **Disposable recovery validation:** SQLite + attachment restore and PostgreSQL two-service restoration with fault-injection gates H20–H31; no production system access and no destructive retention actions.
+- **Security and architecture audit:** documented actionable readiness blockers and the absence of a bundled deterministic production mutation executor.
+- **Installable release marker:** `skills/maintain-server-containers/VERSION` records the skill package version; both plugin manifests are synchronized.
+- **Publishing:** `v0.3.0` is a source/skill release. It neither updates existing installations nor authorizes real Docker changes.
 
 ## 0.2.0 - 2026-10-12
 
