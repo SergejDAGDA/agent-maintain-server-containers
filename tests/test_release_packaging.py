@@ -58,6 +58,8 @@ class PublicReleasePackagingTests(unittest.TestCase):
         self.assertIn('select(.ref == $full)', workflow)
         self.assertNotIn('git/ref/tags/$RELEASE_TAG', workflow)
         self.assertIn('gh release create', workflow)
+        self.assertIn('Published v0.3.0 is frozen', workflow)
+        self.assertIn('de1708213dbaf2895719120023d5bddfe42715e3', workflow)
         self.assertIn('docs/releases/v0.3.0.md', workflow)
 
 

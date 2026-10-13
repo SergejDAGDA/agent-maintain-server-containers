@@ -78,6 +78,14 @@ jobs:
             echo "Refuse ambiguous tag lookup result"
             exit 1
           fi
+          # This release is already published at its verified final SHA.
+          # New main commits MUST NOT move its frozen tag. Still fail closed
+          # on unexpected tag rewrites or a missing published Release.
+          if [[ "$existing" == "de1708213dbaf2895719120023d5bddfe42715e3" ]] \
+             && gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Published v0.3.0 is frozen; new main commits do not republish it"
+            exit 0
+          fi
           if [[ -n "$existing" && "$existing" != "$RELEASE_SHA" ]]; then
             echo "Refuse release: existing tag points to a different commit"
             exit 1

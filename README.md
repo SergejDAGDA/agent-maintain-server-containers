@@ -51,6 +51,31 @@ Updating a repository checkout or plugin marketplace **does not automatically
 replace an older user-scope skill**. Back up an existing installation and
 check duplicate skill locations before updating.
 
+## Practical read-only acceptance (post-v0.3.0)
+
+An initial real-world audit exposed an **interpreter dependency gap**:
+installing a skill does not install PyYAML into every Python interpreter.
+The skill now includes a standard-library-only
+[`scripts/doctor.py`](skills/maintain-server-containers/scripts/doctor.py).
+Run it with the same interpreter planned for `maintenance.py`.
+Prefer an existing **local** Codex virtual environment with PyYAML;
+do not install packages on the inspected server merely for a read-only audit.
+
+A separate [Compose source preflight](skills/maintain-server-containers/scripts/compose_preflight.py)
+checks an explicit ordered list of Compose files **on the host where the
+files exist**. Only the optional `--render` flag invokes
+`docker compose config --quiet`, after source/environment review; raw
+interpolated output and error messages are withheld. Neither successful
+presence checks nor a local render validates runtime state or authorizes
+updates. Missing temporary overrides, missing required environment,
+unmanaged services, incomplete aggregate identities, and unverified
+restore capability are blocking findings. External-admin services remain
+**NO_TOUCH**; provide feedback to their administrator, never change them
+unilaterally.
+
+No version change is implied until a separate public release is created;
+the installed `v0.3.0` does **not** yet include these changes.
+
 ## Why
 
 Routine Docker maintenance is more complex than pulling `latest`. Real deployments may contain persistent accounts, databases, media files, encrypted credentials, externally managed stacks and schema migrations. Upgrading application binaries should not silently replace any of that state.
