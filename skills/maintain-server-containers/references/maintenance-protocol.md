@@ -4,6 +4,53 @@
 
 Inventory the Compose project, service names, images and resolved image IDs, configured restart/health, mount sources/destinations and flags, published ports/interfaces, networks, shared dependencies, stateful services and deployment file ownership. Mark a service as UNKNOWN if source-of-truth is unclear. Do not infer "stateless" from small image size or an empty visible directory.
 
+## First practical audit: source and toolchain readiness
+
+Run the installed `scripts/doctor.py` with the **same interpreter**
+chosen for `maintenance.py`. A successful installation of an Agent Skill
+is not evidence that PyYAML exists in each environment. A missing PyYAML
+package blocks the YAML validator, but it does **not** justify installing
+packages on a server during a read-only audit. Use an existing trusted local
+venv, or stop with a clear dependency blocker. JSON-format policy
+validation does not require PyYAML.
+
+When the policy is in a local checkout but the Docker Engine is on another
+host, distinguish two independent evidence paths: policy validation in
+the local Python environment versus inventory of the remote Docker
+daemon over a previously authorized read-only connection. A local
+`maintenance.py --live` does not automatically reach that remote host.
+
+For each discovered Compose project:
+
+- Record the exact registered **ordered** Compose file list and original
+  working directory, without revealing secrets. Missing or ephemeral
+  `/tmp` override files block source reproduction.
+- On the host that actually stores those Compose files, use
+  `scripts/compose_preflight.py --file path1 --file path2` for file
+  presence (stdlib only). After reviewing the files and environment,
+  optionally use `--render` to invoke only
+  `docker compose -f path1 -f path2 config --quiet`.
+  Never assume remote file paths exist on the Codex workstation.
+- Missing required interpolation variables, unreviewed includes or
+  inaccessible files mean `SOURCE_NONREPRODUCIBLE`. Do not invent an
+  environment variable, recreate a lost override or edit policy to
+  silence errors. Quiet render success is *not* proof of running state,
+  application readiness or restore capability.
+- Enumerate all runtime Compose services and unlabelled containers, and
+  mark any missing from maintenance policy `UNMANAGED` / not eligible
+  rather than silently dropping them from the inventory.
+- Verify group identities for every constituent container/image, not
+  merely the primary service record. Cross-project networks, Docker
+  socket mounts and host privileges create update boundaries.
+- Treat services run by a separate administrator as
+  `EXTERNAL_ADMIN / NO_TOUCH`, even if installed without Compose.
+  Report risk observations for the administrator; never unilaterally
+  change ports, access, images or persistent state.
+
+Do not mistake absent healthchecks for a healthy application. Presence
+of Restic snapshots means only snapshot metadata exists unless
+application-consistent restore has been proven independently.
+
 ## Plan and authorization boundary
 
 A plan names exact service/group, immutable current identity, target version and intended digest, expected runtime mutations, backup/restore boundary and smoke procedure. It must list exclusions. A single user's instruction to update eligible services permits the bounded actions described in that plan but does not grant permission for other projects or speculative migrations.
