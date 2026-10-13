@@ -51,7 +51,25 @@ The bundled validator checks syntax, required fields and some logical contradict
 
 ### Extending the schema
 
-Project policy may add provenance, release ranges, dependency groups, adapter references, structured backup gates and state-specific checks. The skill must inspect them and fail closed if behavior is unknown, not silently ignore a security-critical rule. Upstream and integration adapters should be explicit, tested and versioned.
+**Portable v1 is now strict.** Its root contains only `schema_version` and
+`services`. Each service may declare only `name`, `policy`, `ownership`,
+`reason`, `deployment`, `image`, `target`, `state`, `backup`,
+`rollback`, `health`, `smoke`, and the validated optional
+`release_management`. Inside the documented portable sections, unknown keys
+also fail validation. Unrecognized keys or payloads are not copied into public
+diagnostic output. Existing documented portable examples remain valid.
+
+Project-specific provenance, extended release ranges, dependency groups,
+additional security invariants, adapter references, and advanced backup gates
+must be expressed in a **separately validated versioned project/native policy**
+or explicitly normalized by reviewed consuming-project code. They cannot be
+silently attached to portable v1 and assumed enforced. The
+`<project>-maintenance/v1` adapter supports defined additional structures and
+code-registered safety adapters; a YAML-provided path never loads Python code.
+A consuming project with extra legacy fields must explicitly migrate/map
+them and review each rule rather than drop unknown safety constraints.
+A project-specific deployment owner must still verify additional dynamic
+security/restore/approval gates; the read-only CLI cannot authorize mutations.
 
 A project with a pre-existing differently shaped `services.yaml` must map it to the portable contract or provide a validated adapter. File naming alone does not establish compatibility.
 
