@@ -43,6 +43,70 @@ python skills/maintain-server-containers/scripts/maintenance.py --policy mainten
 
 The helper runs only read-only Docker `ps` and `inspect` and does not change application state. It supports the portable v1 schema and a read-only validator for namespaced `<project>-maintenance/v1` policies with richer project-owned state contracts, migration/rollback gates and groups. A semantically incomplete `complete` contract is a validation error, not an approval. An invalid portable or extended policy must not trigger `--live` Docker inspection. Selected runtime metadata are strictly typed; host/container network modes and mismatched Docker socket source/type cannot silently pass as normal Compose networking. When `--live` is used for such a policy, only selected Docker metadata is retrieved and compared; metadata matching never proves source reproducibility, backup restoration or application smoke. Other existing policies may require an explicit adapter. For extra global invariants, read [safety-adapter.md](references/safety-adapter.md): unknown rules fail closed unless a trusted, pre-registered, version/digest-matched adapter claims and validates every rule. The default bundled CLI does not auto-load project adapters or allow arbitrary YAML-specified imports; no adapter PASS can waive core safety requirements. A `GATED` or `CANDIDATE` classification never constitutes release, backup or rollback approval. If runtime/policy disagree, reconcile *before* update, not by blindly recreating containers.
 
+## Practical read-only acceptance preflight
+
+For an existing deployment or the first audit of a remote host:
+
+1. **Environment check before validation.** Run
+   `python scripts/doctor.py --format json` from the installed skill directory
+   with the same Python interpreter intended for `maintenance.py`.
+   For YAML, require PyYAML in **that exact interpreter**, not simply in
+   another Python or the skill installation. Reuse a previously reviewed
+   local virtual environment when possible. If missing, report
+   `VALIDATOR_DEPENDENCY_MISSING` and stop the validator; do not install
+   Python dependencies on a server or change a system Python merely to
+   perform an audit. Offline validation of a trusted project-owned policy
+   may run in the local Codex workspace with an existing venv.
+2. **Remote access is not implicit.** `maintenance.py --live` calls the
+   Docker CLI available to its own process. It has no remote host parameter.
+   When the policy is local but Docker is remote, validate the local policy
+   using the local venv, then inventory the remote endpoint with already
+   authorized read-only SSH/Docker commands. Do not label those independent
+   observations as a single helper-verified live result; report the gap.
+3. **Compose source must be reproducible.** Read the *full, ordered* list of
+   Compose files registered for the actual project. Check every path on the
+   **deployment filesystem**, not on a Windows client or unrelated host.
+   The optional `scripts/compose_preflight.py --file <file> ...` checks file
+   presence without invoking Docker. After reviewing the Compose sources
+   and local environment, `--render` invokes only
+   `docker compose [ordered -f files] config --quiet`, withholding raw error
+   output. Run it in the appropriate project directory and original
+   interpolation environment. A missing temporary override, required
+   environment variable or source file is `SOURCE_NONREPRODUCIBLE` and
+   blocks both update and rollback planning; never generate a replacement
+   override or guess missing variables. A successful local render alone
+   does not prove runtime parity or authorize an update.
+4. **Inventory beyond policy records.** Reconcile all Compose projects and
+   orphan/unlabeled containers against policy entries. Unknown/unmanaged
+   runtime defaults to `UNMANAGED / NOT ELIGIBLE`, not `AUTO_SAFE`.
+   Inspect owner and lifecycle; explicitly record cross-project networks,
+   Docker socket mounts, elevated capabilities, host networking and
+   published interfaces without exposing environment values.
+5. **External administrators own their systems.** Even an application outside
+   Compose or policy (for example an independently installed management UI)
+   must remain `EXTERNAL_ADMIN / NO_TOUCH` when administered by another
+   party. Record non-sensitive risks and prepare administrator feedback.
+   Do not alter its image, ports, Docker socket access, firewall, volume,
+   credentials or availability without a separately authorized owner
+   workstream. Socket mounts or a `0.0.0.0` listener are risk indicators,
+   **not proof of public Internet exposure**.
+6. **Check every group member.** A matching primary image ID in an
+   aggregate policy record does not verify the subordinate ML, database,
+   cache or gateway containers. For each grouped component establish exact
+   Compose identity and image digest, mounts, network/port and dependency
+   boundaries. If any member is unresolved, report
+   `GROUP_IDENTITY_INCOMPLETE` and block the whole update group.
+7. **Do not promote metadata to operational proof.** Absence of an
+   `unhealthy` container does not prove application health when checks are
+   absent. A backup snapshot list is not restore evidence. Report
+   `NOT VERIFIED` for restore consistency, application smoke and migration
+   rollback unless independently tested. No update follows merely from
+   a read-only acceptance audit.
+
+The portable helper audits one uniquely identified Compose service at a
+time; a complete topology/source comparison remains an explicit agent task.
+Do not treat a successful preflight or dependency check as update authority.
+
 ## Update policy
 
 | Policy | Behavior |
