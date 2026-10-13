@@ -4,6 +4,16 @@
 **Baseline:** `maintain-server-containers` v0.2.0 (released 2026-10-12).
 **Scope:** generic, reusable Agent Skill and future bounded executor. No real service inventory, deployment credentials, backup data, or consuming-project configuration belongs here.
 
+## Audit checkpoint (2026-10-13)
+
+See [security and architecture audit](SECURITY-ARCHITECTURE-AUDIT-2026-10-13.md)
+for the current source-level assessment of the roadmap. PRs through #20
+established real **disposable synthetic CI** restore/fault exercises and
+experimental signed storage-evidence contracts, not a production provider,
+protected independent authority, installed-skill attestation or mutation
+executor. E01–E04 and D01 remain open. Do not infer completion of this
+roadmap from green H31 tests.
+
 ## Goal and boundaries
 
 Provide an evidence-driven, repeatable lifecycle for Docker Compose applications:
