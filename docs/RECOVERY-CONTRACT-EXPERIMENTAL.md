@@ -427,3 +427,42 @@ runtime or stale trusted revision can defeat this test model. No
 long-lived separate operator, durable signing service, protected transport,
 remote monotonic store, hardware-backed key or inter-host availability is
 implemented. No production backup executor or v0.2.0 release is enabled.
+
+## Local synthetic monotonic anchor publication with atomic CAS (H30)
+
+`monotonic_head_contract.py` defines a narrowly scoped, **experimental
+local** compare-and-swap head journal. It requires an already-created
+filesystem-backed SQLite store, a caller-pinned store ID and a caller-pinned
+genesis anchor. No policy path, arbitrary SQL execution, general restore,
+deployment or backup mutation API exists. The implementation never
+bootstraps a missing database. Only `tests/integration/ci_monotonic_fixture.py`
+may create an empty **synthetic** test store.
+
+A complete bounded history is checked in a consistent transaction: exact
+revision sequence, previous-anchor linkage, deterministic SHA-256 chain,
+unchanged pinned genesis and store identity, and current-head agreement.
+CAS uses SQLite `BEGIN IMMEDIATE` and exact expected
+revision/previous-anchor match. It atomically appends one revision and
+updates the head, or returns `CONFLICT` without changing storage.
+Duplicate IDs, history gaps, foreign/changed store IDs and malformed rows
+block access. Read and write operations require a `trusted_min_revision`
+from separately reviewed calling code. The returned statuses
+`OBSERVED_LOCAL` and `PUBLISHED_LOCAL` never authorize production work.
+
+The new H30 CI scenario starts **two independent Python interpreters**,
+each attempting to publish a different head for revision 1 of the same
+disposable SQLite file. Exactly one succeeds; the other conflicts.
+A new child publishes revision 2 only from the committed revision 1.
+Tests also restore a snapshot of the old synthetic store and simulate
+complete store loss. Both fail closed against the caller-supplied
+higher revision floor. After each run the entire fixture is removed.
+
+**Critical limitation:** SQLite atomicity prevents forks only for writers
+on the **same writable database file**. A separately cloned file, privileged
+storage rollback, changed genesis registration, fabricated revision floor,
+corrupt host, or remote split-brain is not prevented. Neither this local
+CAS journal nor the two CI child processes constitute an independently
+operated monotonic authority. No actual remote publication, immutable
+external high-watermark, multi-host quorum, signature release, protected
+key custody or production executor is implemented. A deliberate synthetic
+bootstrap is not a safe recovery procedure after real state loss.
