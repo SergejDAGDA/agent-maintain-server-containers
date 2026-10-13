@@ -32,7 +32,7 @@ class PublicReleasePackagingTests(unittest.TestCase):
         self.assertIn("read-only", notes.lower())
         self.assertIn("off-host", notes)
         self.assertIn("no bundled deterministic production", notes.lower())
-        self.assertIn("v0.2.0", change)
+        self.assertIn("## 0.2.0 - 2026-10-12", change)
 
     def test_release_docs_explain_controlled_codex_upgrade(self):
         content = (ROOT / "docs" / "CODEX-INSTALL-UPDATE.md").read_text()
