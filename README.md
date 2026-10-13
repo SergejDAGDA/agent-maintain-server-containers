@@ -10,7 +10,7 @@ Installed skill name: `maintain-server-containers`
 
 Invocation: `$maintain-server-containers`
 
-**Status: v0.2.0 (2026-10-12).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
+**Status: v0.3.0 (2026-10-13).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
 ## Architecture and security audit (13 October 2026)
 
@@ -20,10 +20,10 @@ The audit confirms a passing read-only v0.2.0 baseline and substantial
 **synthetic** disaster-recovery contract coverage, but **NO-GO** for claiming
 a production mutation executor, independently secured off-host backup, or
 trusted remote monotonic anchor service. This repository update does not
-upgrade any separately installed skill. The next development step is bounded
-input hardening and documentation freeze, not further proof-stack expansion.
+upgrade any separately installed skill. PR #22 completed bounded
+input hardening; this v0.3.0 release does not add production write authority.
 
-## Post-audit hardening (PR #22, source branch)
+## Post-audit hardening (included in v0.3.0)
 
 After the [13 October architecture audit](docs/SECURITY-ARCHITECTURE-AUDIT-2026-10-13.md),
 portable v1 validation is deliberately strict: undeclared policy fields,
@@ -41,6 +41,15 @@ work. Even with every CI test green, this repository still has **no**
 production Docker mutation executor, independent off-host backup
 service, or protected remote monotonic-witness authority. Do not infer
 operational safety from the experimental H31 tests.
+
+## Install or update in Codex
+
+Follow the [version-pinned Codex update guide](docs/CODEX-INSTALL-UPDATE.md)
+and use the canonical skill folder from the [v0.3.0 release](https://github.com/SergejDAGDA/agent-maintain-server-containers/releases/tag/v0.3.0).
+The installable folder contains a `VERSION` marker for exact-version checks.
+Updating a repository checkout or plugin marketplace **does not automatically
+replace an older user-scope skill**. Back up an existing installation and
+check duplicate skill locations before updating.
 
 ## Why
 
@@ -238,7 +247,7 @@ Do not store secrets, internal inventory, hostnames, tokens, user files or priva
 
 ## Current capability boundary
 
-| Capability | v0.2.0 |
+| Capability | v0.3.0 |
 | --- | --- |
 | Policy schema validation | Implemented |
 | Read-only Compose container identity check | Implemented |
@@ -253,7 +262,7 @@ The next version can add a tested executor with explicit adapter contracts and d
 
 ## Future lifecycle and recovery design
 
-The proposals in [the development roadmap](docs/ROADMAP.md), [lifecycle/recovery contract](docs/LIFECYCLE-RECOVERY-DESIGN.md), and [disposable test-harness specification](docs/DISPOSABLE-TEST-HARNESS.md) describe future work: typed state and evidence, event-linked backups, isolated restore tests, bounded execution and safe decommission. **These are design documents, not features included in v0.2.0.** The read-only CLI and existing safety gates remain unchanged.
+The proposals in [the development roadmap](docs/ROADMAP.md), [lifecycle/recovery contract](docs/LIFECYCLE-RECOVERY-DESIGN.md), and [disposable test-harness specification](docs/DISPOSABLE-TEST-HARNESS.md) describe future work: typed state and evidence, event-linked backups, isolated restore tests, bounded execution and safe decommission. **These are design documents, not production capabilities added by v0.3.0.** The read-only CLI and existing safety gates remain unchanged.
 
 ## Development
 
