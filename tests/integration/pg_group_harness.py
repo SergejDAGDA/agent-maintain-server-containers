@@ -61,6 +61,7 @@ from ci_pg_inspector import SyntheticPgReadOnlyInspector  # noqa: E402
 from ci_anchor_head import SyntheticCiHeadSource  # noqa: E402
 from ci_forked_head import SyntheticProcessHead, WORKER as HEAD_WORKER  # noqa: E402
 from ci_monotonic_fixture import bootstrap_test_only  # noqa: E402
+from ci_e2e_fault_chain import evaluate_test_chain  # noqa: E402
 from monotonic_head_contract import SyntheticMonotonicJournal  # noqa: E402
 from current_anchor_source_contract import (  # noqa: E402
     ReviewedHeadReader, ReviewedHeadSource,
@@ -938,6 +939,146 @@ def run() -> None:
             )
             if missing_reader.current(trusted_min_revision=2).status != "BLOCKED":
                 raise RuntimeError("deleted CAS store implicitly recreated")
+        # H31: perform a *single chain* of exact-snapshot Restic, signed
+        # witness-ledger anchor, process-separated head and monotonic CAS
+        # checks. Any injected fault blocks the chain. Even a healthy
+        # local chain is never independent off-host recovery proof.
+        if source.exists() or containers(original_project):
+            raise RuntimeError("source-loss prerequisite for H31 not met")
+        assert_group(restored_ids, restored, seed)
+        with sqlite3.connect(ledger_path) as previously_used:
+            witness_ledger = DurableWitnessLedger(previously_used)
+            if witness_ledger.is_current(signed.attestation_id,
+                                         now_unix=int(time.time())):
+                raise RuntimeError("revoked witness receipt became current again")
+        chain_store_id = secrets.token_hex(32)
+        chain_store_path = sandbox / "ci-h31-monotonic-chain.sqlite"
+        with sqlite3.connect(chain_store_path) as chain_new:
+            bootstrap_test_only(
+                chain_new, ledger_id="ci-witness-ledger",
+                store_id=chain_store_id, genesis_anchor=current_anchor_id,
+            )
+            chain_snapshot = sandbox / "ci-h31-older-head.sqlite"
+            with sqlite3.connect(chain_snapshot) as copy:
+                chain_new.backup(copy)
+
+        def check_h31(ledger_db, cas_db, *, current_envelope,
+                      head_id, minimum_revision):
+            cas = SyntheticMonotonicJournal(
+                cas_db, ledger_id="ci-witness-ledger",
+                expected_store_id=chain_store_id,
+                expected_genesis_anchor=current_anchor_id,
+            )
+            forked.now_unix = int(time.time())
+            return evaluate_test_chain(
+                snapshot_check=lambda: provider.check_pg(snapshot_id,
+                                                          package=checkpoint),
+                signed_reader=forked_reader,
+                ledger_connection=ledger_db,
+                signed_anchor=current_envelope,
+                anchor_trust=anchor_trust,
+                publication=cas,
+                ledger_id="ci-witness-ledger",
+                expected_anchor_id=head_id,
+                trusted_ledger_revision=current_state.used_count +
+                                        current_state.revoked_count,
+                trusted_publication_revision=minimum_revision,
+                now_unix=int(time.time()),
+            )
+
+        def run_h31(*, current_envelope=None, head_id=None,
+                    minimum_revision=0, ledger_file=None, cas_file=None):
+            with sqlite3.connect(
+                ledger_file if ledger_file is not None else ledger_path
+            ) as ledger_db, sqlite3.connect(
+                cas_file if cas_file is not None else chain_store_path
+            ) as cas_db:
+                return check_h31(
+                    ledger_db, cas_db,
+                    current_envelope=(anchor_envelope if current_envelope is None
+                                      else current_envelope),
+                    head_id=(current_anchor_id if head_id is None else head_id),
+                    minimum_revision=minimum_revision,
+                )
+
+        def require_h31(value, expected_status, label):
+            if (value.status != expected_status or value.restore_authorized
+                    or value.off_host_proven or value.eligible_for_prune):
+                raise RuntimeError("H31 synthetic cross-layer invariant failed: " + label)
+
+        forked.mode = "normal"
+        forked.anchor_id = current_anchor_id
+        forked.revision = current_state.used_count + current_state.revoked_count
+        require_h31(run_h31(), "LOCAL_EVIDENCE_CONSISTENT_ONLY", "local-baseline")
+        # Loss of this run's key and local repository must block *the whole*
+        # cross-layer assessment even when signatures and journals are valid.
+        parked_h31_key = sandbox / "h31-key-parked"
+        provider.password.rename(parked_h31_key)
+        try:
+            require_h31(run_h31(), "BLOCKED", "missing-restic-key")
+        finally:
+            parked_h31_key.rename(provider.password)
+        require_h31(run_h31(), "LOCAL_EVIDENCE_CONSISTENT_ONLY", "key-returned")
+        parked_h31_repo = sandbox / "h31-repository-parked"
+        provider.repo.rename(parked_h31_repo)
+        try:
+            require_h31(run_h31(), "BLOCKED", "missing-restic-repository")
+        finally:
+            parked_h31_repo.rename(provider.repo)
+        require_h31(run_h31(), "LOCAL_EVIDENCE_CONSISTENT_ONLY",
+                    "repository-returned")
+        for fault in ("crash", "foreign_key", "replay"):
+            forked.mode = fault
+            require_h31(run_h31(), "BLOCKED", "signer-" + fault)
+            forked.mode = "normal"
+            require_h31(run_h31(), "LOCAL_EVIDENCE_CONSISTENT_ONLY",
+                        "signer-restarted")
+        # Pre-revocation SQLite must not match the *newer* signed head.
+        require_h31(run_h31(ledger_file=old_ledger_path), "BLOCKED",
+                    "witness-journal-rolled-back")
+
+        # Publish a freshly signed anchor ID for the SAME actual witness
+        # ledger state through the disposable CAS. Old anchor becomes stale.
+        new_h31_envelope, new_h31_id = make_anchor(
+            current_state, secrets.token_hex(32))
+        with sqlite3.connect(chain_store_path) as chain_db:
+            chain = SyntheticMonotonicJournal(
+                chain_db, ledger_id="ci-witness-ledger",
+                expected_store_id=chain_store_id,
+                expected_genesis_anchor=current_anchor_id,
+            )
+            updated = chain.compare_and_swap(
+                expected_revision=0, expected_anchor_id=current_anchor_id,
+                new_revision=1, new_anchor_id=new_h31_id,
+                trusted_min_revision=0,
+            )
+            if updated.status != "PUBLISHED_LOCAL":
+                raise RuntimeError("H31 synthetic chain cannot advance CAS")
+        require_h31(run_h31(minimum_revision=1), "BLOCKED",
+                    "stale-anchor-after-publication")
+        forked.anchor_id = new_h31_id
+        forked.revision = current_state.used_count + current_state.revoked_count
+        require_h31(run_h31(current_envelope=new_h31_envelope,
+                            head_id=new_h31_id, minimum_revision=1),
+                    "LOCAL_EVIDENCE_CONSISTENT_ONLY", "revised-anchor-recovered")
+        require_h31(run_h31(current_envelope=new_h31_envelope,
+                            head_id=new_h31_id, minimum_revision=1,
+                            cas_file=chain_snapshot),
+                    "BLOCKED", "cas-rollback")
+        # Simulate lost publication state. Never implicitly rebootstrap it.
+        absent_chain = sandbox / "ci-h31-lost-monotonic.sqlite"
+        require_h31(run_h31(current_envelope=new_h31_envelope,
+                            head_id=new_h31_id, minimum_revision=1,
+                            cas_file=absent_chain),
+                    "BLOCKED", "cas-store-lost")
+        require_h31(run_h31(current_envelope=new_h31_envelope,
+                            head_id=new_h31_id, minimum_revision=1),
+                    "LOCAL_EVIDENCE_CONSISTENT_ONLY", "final-restarted-reader")
+        assert_group(restored_ids, restored, seed)
+        print("H31 PASS cross-layer exact Restic snapshot, signed source, "
+              "witness continuity and CAS; key/repository/process/ledger "
+              "loss, replay and restart fail closed; local-only remains "
+              "non-authorizing", flush=True)
         print("H30 PASS two synthetic process writers CAS conflict, "
               "revision-2 restart, rollback and lost-store refusal", flush=True)
         print("H29 PASS two process-separated signed head replies; "
