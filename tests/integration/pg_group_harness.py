@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -58,6 +59,7 @@ from ledger_continuity_contract import (  # noqa: E402
 )
 from ci_pg_inspector import SyntheticPgReadOnlyInspector  # noqa: E402
 from ci_anchor_head import SyntheticCiHeadSource  # noqa: E402
+from ci_forked_head import SyntheticProcessHead, WORKER as HEAD_WORKER  # noqa: E402
 from current_anchor_source_contract import (  # noqa: E402
     ReviewedHeadReader, ReviewedHeadSource,
 )
@@ -783,6 +785,53 @@ def run() -> None:
             if (old_db.status != "BLOCKED"
                     or "continuity:ledger_state_mismatch" not in old_db.blockers):
                 raise RuntimeError("synthetic head reader accepted rolled-back SQLite")
+        # H29: two separate throwaway Python child interpreters provide the
+        # read-only signed responses over bounded JSON stdin/stdout. No
+        # network, daemon or independent/remote signing authority exists.
+        forked = SyntheticProcessHead(
+            head_private_key, anchor_id=current_anchor_id,
+            revision=current_state.used_count + current_state.revoked_count,
+            worker_sha256="sha256:" + _sha_file(HEAD_WORKER),
+            now_unix=int(time.time()),
+        )
+        forked_reader = ReviewedHeadReader(HERE, ReviewedHeadSource(
+            source_id="ci-process-head", key_id="ci-process-key",
+            fault_domain="ci-simulated-process-domain",
+            public_key=head_private_key.public_key().public_bytes(
+                Encoding.Raw, PublicFormat.Raw),
+            source_file_sha256="sha256:" + _sha_file(HERE / "ci_forked_head.py"),
+            source=forked,
+        ))
+        def verify_child_head(database):
+            return forked_reader.evaluate(
+                database, anchor_envelope, anchor_trust,
+                ledger_id="ci-witness-ledger", now_unix=int(time.time()),
+                trusted_min_revision=current_state.used_count +
+                                     current_state.revoked_count,
+            )
+        def concurrent_request(_index):
+            with sqlite3.connect(ledger_path) as database:
+                return verify_child_head(database)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            parallel = list(executor.map(concurrent_request, range(2)))
+        if (any(item.status != "SIGNED_SOURCE_CLAIM_MATCHED"
+                or item.restore_authorized or item.off_host_proven
+                for item in parallel)
+                or len(set(forked.pids_seen)) != 2):
+            raise RuntimeError("process-separated CI signed head reads did not agree")
+        with sqlite3.connect(ledger_path) as database:
+            forked.mode = "crash"
+            crashed = verify_child_head(database)
+            if (crashed.status != "BLOCKED"
+                    or "head:source_unavailable" not in crashed.blockers):
+                raise RuntimeError("dead CI worker was treated as valid head source")
+            forked.mode = "foreign_key"
+            foreign = verify_child_head(database)
+            if (foreign.status != "BLOCKED"
+                    or "head:invalid_source_signature" not in foreign.blockers):
+                raise RuntimeError("foreign child signing key was trusted")
+        print("H29 PASS two process-separated signed head replies; "
+              "crash/foreign-key refusal and separate worker PIDs", flush=True)
         print("H28 PASS signed reviewed head-source challenge, outage/replay refusal, "
               "and rollback guard; no live independent authority", flush=True)
         print("H27 PASS externally pinned synthetic ledger anchor rejects "

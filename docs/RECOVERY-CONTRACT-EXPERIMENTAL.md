@@ -394,3 +394,36 @@ sandboxing or a defense against process-level compromise. The fake CI
 source and signing key are on the same runner, so the tests **do not prove
 actual independence or rollback safety under a simultaneous compromise**.
 The current published v0.2.0 skill remains unchanged.
+
+## Separate synthetic signing process via bounded stdio (H29)
+
+PR #18 adds a test-only process boundary instead of relying solely on an
+in-process signing object. A fixed, source-pinned `ci_forked_head.py`
+adapter launches exactly `ci_head_child.py` using an isolated Python
+interpreter, with bounded JSON stdin/stdout, a short deadline, checked
+exit status and explicit child cleanup. The worker has no network endpoint,
+listening socket, server credentials, backup or mutation capability.
+No configuration document selects its command or an arbitrary subprocess.
+
+The subprocess receives a synthetic Ed25519 seed through a private test
+pipe, signs a response bound to the original challenge and immutable
+anchor ID, and exits. Separate requests result in different process IDs.
+Concurrent synthetic readers use independent SQLite connections and
+validate the same signed high-watermark. Fault injection exercises early
+process death, timeout, malformed/truncated response, unexpected signing
+key, old revision, changed head, replay of a previous response and
+rollback to an earlier synthetic SQLite journal. Every failed condition
+is interpreted conservatively and never authorizes restore or deletion.
+
+H29 in the disposable PostgreSQL/Restic fixture verifies two concurrent
+real child-interpreter responses, different child PIDs, rejection of a
+crashed signer and refusal of another signing key after H28. Everything
+runs on the same ephemeral GitHub CI host and is cleaned there.
+
+**This is process isolation for testing, not an independent trust domain.**
+The parent deliberately holds the signing seed and sends it to each child.
+A shared host compromise, a hostile reviewed adapter, a malicious Python
+runtime or stale trusted revision can defeat this test model. No
+long-lived separate operator, durable signing service, protected transport,
+remote monotonic store, hardware-backed key or inter-host availability is
+implemented. No production backup executor or v0.2.0 release is enabled.

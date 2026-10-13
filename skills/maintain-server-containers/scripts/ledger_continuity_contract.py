@@ -88,9 +88,9 @@ def read_ledger_state(connection: Any) -> LedgerState:
         return LedgerState(False, None, 0, 0, (code,))
     if not isinstance(connection, sqlite3.Connection):
         return blocked("continuity:invalid_connection")
-    if connection.in_transaction:
-        return blocked("continuity:active_transaction")
     try:
+        if connection.in_transaction:
+            return blocked("continuity:active_transaction")
         dbs = connection.execute("PRAGMA database_list").fetchall()
         files = [record[2] for record in dbs if record[1] == "main"]
         if (len(files) != 1 or not files[0]
@@ -144,11 +144,11 @@ def read_ledger_state(connection: Any) -> LedgerState:
         return LedgerState(True, "sha256:" + sha.hexdigest(),
                            counts["witness_used"], counts["witness_revoked"], ())
     except (sqlite3.Error, ValueError, TypeError):
-        if connection.in_transaction:
-            try:
+        try:
+            if connection.in_transaction:
                 connection.rollback()
-            except sqlite3.Error:
-                pass
+        except sqlite3.Error:
+            pass
         return blocked("continuity:unreadable_or_invalid_ledger")
 
 
