@@ -68,7 +68,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          existing="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)"
+          # An absent exact tag is represented as an empty list. A direct
+          # lookup with --jq can print the literal "null" on a 404 payload,
+          # which must never be mistaken for the SHA of a real tag.
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RELEASE_TAG" \
+            | jq -r --arg full "refs/tags/$RELEASE_TAG" \
+              '[.[] | select(.ref == $full)][0].object.sha // empty')"
+          if [[ "$existing" == "null" ]]; then
+            echo "Refuse ambiguous tag lookup result"
+            exit 1
+          fi
           if [[ -n "$existing" && "$existing" != "$RELEASE_SHA" ]]; then
             echo "Refuse release: existing tag points to a different commit"
             exit 1
