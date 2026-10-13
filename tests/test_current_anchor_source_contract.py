@@ -136,12 +136,12 @@ class CurrentAnchorHeadTests(unittest.TestCase):
             ),
         )
 
-    def evaluate(self, *, reader=None, connection=None, min_revision=None, now=NOW + 1):
+    def evaluate(self, *, reader=None, connection=None, min_revision="DEFAULT", now=NOW + 1):
         return (reader or self.reader).evaluate(
             self.connection if connection is None else connection,
             self.anchor, self.trust, ledger_id="synthetic-ledger",
             now_unix=now,
-            trusted_min_revision=(self.revision if min_revision is None else min_revision),
+            trusted_min_revision=(self.revision if min_revision == "DEFAULT" else min_revision),
         )
 
     def blocked(self, code, **kwargs):
