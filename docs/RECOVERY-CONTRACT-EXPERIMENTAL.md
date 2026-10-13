@@ -351,3 +351,46 @@ anchor ID from a separately protected and freshness-verified authority
 before any reliable rollback decision. In the absence of such an authority,
 this verification is not production rollback protection. No status
 authorizes restore, deploy, update, deletion or off-host recovery claims.
+
+## Code-registered signed current-anchor source (H28, experimental)
+
+`current_anchor_source_contract.py` adds a reviewed, read-only source interface
+for the current anchor ID expected by the preceding
+`ledger_continuity_contract.py`. The trusted calling code constructs and
+registers an actual reader object, its Ed25519 verification key, source ID
+and SHA-256 pin for the implementation source file inside a reviewed root.
+Untrusted policy files, response documents and URLs cannot select or import
+an adapter.
+
+Each verification makes a new random challenge and calls the registered
+source's read-only `read_current_head(ledger_id, challenge)` method. The
+response is a strict Ed25519 signed `current-anchor-head-response/v1`
+statement binding source/key/ledger identities, exact immutable anchor ID,
+revision, challenge and short issue/expiration window. An unavailable source,
+unknown fields, invalid signature, replayed challenge, stale response,
+incorrect head ID or revision and source-code pin mismatch fail closed.
+
+The verifier then requires the claimed head to match a separately signed
+ledger anchor and the **actual current SQLite witness ledger contents**.
+A `trusted_min_revision` must be supplied by reviewed calling code to
+prevent acceptance of a freshly signed older head when a higher revision
+is already known. A missing/invalid minimum blocks the request. Successful
+verification returns only `SIGNED_SOURCE_CLAIM_MATCHED`, which never
+authorizes restore, pruning, migration or a claim of off-host proof.
+
+H28 exercises a same-runner synthetic head responder in GitHub CI using
+ephemeral Ed25519 keys. It checks matching state, forced source outage,
+replay of a previously signed response under a new random challenge and
+rollback to a pre-revocation synthetic SQLite file. These are **contract
+checks**, not operational independent-anchor service tests.
+
+**Unimplemented trust dependencies:** physical separation or operation of
+the source, true monotonic publication, externally protected high-water
+revision, clock integrity, durable challenge tracking, network transport,
+TLS or hardware key custody. A compromised or dishonest registered source
+can newly sign an old anchor, especially when the independently trusted
+minimum revision is stale or fabricated. Source-code hashing is not
+sandboxing or a defense against process-level compromise. The fake CI
+source and signing key are on the same runner, so the tests **do not prove
+actual independence or rollback safety under a simultaneous compromise**.
+The current published v0.2.0 skill remains unchanged.
