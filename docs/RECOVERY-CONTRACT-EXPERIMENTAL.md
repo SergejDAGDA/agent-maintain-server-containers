@@ -466,3 +466,41 @@ operated monotonic authority. No actual remote publication, immutable
 external high-watermark, multi-host quorum, signature release, protected
 key custody or production executor is implemented. A deliberate synthetic
 bootstrap is not a safe recovery procedure after real state loss.
+
+## H31 integrated local recovery evidence fault matrix (synthetic CI only)
+
+H31 unifies the existing disposable PostgreSQL/Restic recovery evidence
+into one non-authorizing test-only evaluation
+(`tests/integration/ci_e2e_fault_chain.py`). It checks the exact immutable
+snapshot through the reviewed Restic fixture, the registered signed current
+anchor source, the actual SQLite witness-ledger digest and revocations,
+and a caller-pinned monotonic publication head. A problem at **any** stage
+blocks the whole local assessment, with fixed, non-secret diagnostic codes.
+
+The H31 sequence runs only after the F2 isolated PostgreSQL restore and
+application smoke, H20–H30. The original synthetic source is already lost,
+and the synthetic application must still be healthy in its separate restored
+Compose project. The chain then exercises a temporary missing Restic key,
+unavailable local repository, crashed child signer, substituted signing key,
+replayed signed response, pre-revocation witness SQLite rollback, stale
+head after CAS publication, rolled-back CAS store, and total publication
+store loss. Tests restore only their own temporarily parked key/repository,
+start new disposable child readers, and confirm local evidence consistency
+returns with the correct latest signed anchor and CAS state. Previously
+revoked witness receipts must remain revoked.
+
+The only successful status is `LOCAL_EVIDENCE_CONSISTENT_ONLY`, carrying
+`chain:independent_off_host_not_proven`. All results retain
+`restore_authorized=False`, `off_host_proven=False`, and
+`eligible_for_prune=False`. It is **never** a production-recovery or
+disaster-readiness approval. Missing trusted inputs, unavailable snapshots,
+incorrect signatures, altered journals and missing/stale publication
+state fail closed.
+
+This is a synthetic acceptance test of already existing contracts, **not**
+an independent production service, real off-host repository, restored
+tenant data, live infrastructure or external monotonic authority. Its
+revision floors, key placement, process trust and filesystem state all
+remain controlled by a single ephemeral GitHub runner. The test does not
+implement production backup capture, failover, deletion, automatic
+recovery or a deploy executor. No installed v0.2.0 skill is modified.
