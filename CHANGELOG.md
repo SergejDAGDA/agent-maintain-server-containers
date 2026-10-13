@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — post-audit source hardening (PR #22)
+
+- Fail closed when portable v1 policy contains undeclared top-level, service or
+  documented-section fields; withhold unknown keys and values from diagnostics.
+  Existing documented portable examples remain valid. Consuming projects with
+  bespoke safety fields need an explicit migration or reviewed native adapter.
+- Reject nonmapping synthetic runtime evidence rather than raising an
+  unhandled exception; direct assessment also reports malformed runtime data
+  as unverified.
+- Require an actual integer `policy_revision` in namespaced native policies,
+  preventing Python boolean `True` from being accepted as revision `1`.
+- Limit portable read-only Docker inspect to selected container identity,
+  image, running/health and minimal mount attributes, not the full inspect
+  record.
+- Add negative regressions and English/Russian capability-boundary guidance.
+- No production Docker executor or independently protected backup service.
+  No published version bump or installed skill upgrade is implied.
+
 
 ## 0.2.0 - 2026-10-12
 
