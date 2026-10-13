@@ -23,6 +23,25 @@ trusted remote monotonic anchor service. This repository update does not
 upgrade any separately installed skill. The next development step is bounded
 input hardening and documentation freeze, not further proof-stack expansion.
 
+## Post-audit hardening (PR #22, source branch)
+
+After the [13 October architecture audit](docs/SECURITY-ARCHITECTURE-AUDIT-2026-10-13.md),
+portable v1 validation is deliberately strict: undeclared policy fields,
+including unreviewed safety extensions, are errors rather than invisible
+permissions. Extended project-specific semantics require explicit, reviewed
+normalization or a native project policy. Malformed synthetic runtime
+evidence is rejected; portable `--live` uses a minimal Docker inspect
+projection rather than requesting the full container record.
+
+**Distribution and verification boundary:** source changes on `main` do not
+update an installed Agent Skill. Python requirements and the CI test toolchain
+are not a reproducible locked production distribution; install/package
+integrity attestation and immutable tooling pins remain separate release
+work. Even with every CI test green, this repository still has **no**
+production Docker mutation executor, independent off-host backup
+service, or protected remote monotonic-witness authority. Do not infer
+operational safety from the experimental H31 tests.
+
 ## Why
 
 Routine Docker maintenance is more complex than pulling `latest`. Real deployments may contain persistent accounts, databases, media files, encrypted credentials, externally managed stacks and schema migrations. Upgrading application binaries should not silently replace any of that state.

@@ -19,7 +19,45 @@ POLICIES = {"AUTO_SAFE", "AUTO_GATED", "MANUAL", "PIN_ONLY", "NO_TOUCH"}
 OWNERS = {"sandbox", "application_project", "external_admin", "unknown"}
 POLICY_VERSION = "1"
 NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
+
 SUPPORTED = {"validate", "audit", "status", "plan"}
+
+# Fail closed on unrecognized portable v1 rules rather than treating project
+# extensions or undeclared approval gates as verified policy.
+PORTABLE_ROOT_FIELDS = frozenset({"schema_version", "services"})
+PORTABLE_SERVICE_FIELDS = frozenset({
+    "name", "policy", "ownership", "reason", "deployment", "image",
+    "target", "state", "backup", "rollback", "health", "smoke",
+    "release_management",
+})
+PORTABLE_SECTION_FIELDS = {
+    "deployment": frozenset({"compose_file", "project", "service"}),
+    "image": frozenset({"current"}),
+    "target": frozenset({"image"}),
+    "state": frozenset({"complete", "binds", "volumes", "databases",
+                        "user_files", "secret_refs"}),
+    "backup": frozenset({"required"}),
+    "rollback": frozenset({"class"}),
+    "health": frozenset({"container"}),
+    "smoke": frozenset({"profile"}),
+}
+
+# Deliberately minimal Docker inspect output: never request Config.Env,
+# labels, arguments, host security metadata or the raw full inspect object.
+# Static Go template text is code-owned and not selected by the YAML policy.
+PORTABLE_INSPECT_TEMPLATE = (
+    '{"Id":{{json .Id}},"Image":{{json .Image}},'
+    '"Config":{"Image":{{json .Config.Image}}},'
+    '"State":{"Running":{{json .State.Running}},'
+    '"Health":{{with .State.Health}}{"Status":{{json .Status}}}'
+    '{{else}}null{{end}}},'
+    '"Mounts":[{{range $i, $mount := .Mounts}}'
+    '{{if $i}},{{end}}'
+    '{"Type":{{json $mount.Type}},"Source":{{json $mount.Source}},'
+    '"Name":{{json $mount.Name}},"Destination":{{json $mount.Destination}},'
+    '"RW":{{json $mount.RW}}}'
+    '{{end}}]}'
+)
 
 
 class PolicyError(Exception):
@@ -61,6 +99,10 @@ def load_policy(path: Path) -> dict:
 def normalize(data: dict) -> tuple[list[dict], list[str]]:
     """Normalize the documented portable v1 schema. Never assume unknown fields are safe."""
     errors: list[str] = []
+    if any(not isinstance(k, str) for k in data):
+        errors.append("portable policy top-level field keys must be strings")
+    if set(data).difference(PORTABLE_ROOT_FIELDS):
+        errors.append("unsupported portable top-level fields (names and values withheld)")
     version = data.get("schema_version")
     if type(version) is not str or version != POLICY_VERSION:
         errors.append("schema_version must be '1' (explicit migration required)")
@@ -101,9 +143,19 @@ def normalize(data: dict) -> tuple[list[dict], list[str]]:
             errors.append(f"{name}: invalid or missing ownership")
         if any(not isinstance(key, str) for key in entry):
             errors.append(f"{name}: service field keys must all be strings")
-        for field in ("deployment", "state", "backup", "rollback", "health", "smoke", "target"):
-            if field in entry and not isinstance(entry[field], dict):
+        if set(entry).difference(PORTABLE_SERVICE_FIELDS):
+            errors.append(f"{name}: unsupported portable service fields (names and values withheld)")
+        for field, allowed in PORTABLE_SECTION_FIELDS.items():
+            if field not in entry:
+                continue
+            section = entry[field]
+            if not isinstance(section, dict):
                 errors.append(f"{name}: {field} must be a mapping")
+            else:
+                if any(not isinstance(k, str) for k in section):
+                    errors.append(f"{name}: {field} keys must be strings")
+                if set(section).difference(allowed):
+                    errors.append(f"{name}: unsupported {field} fields (names and values withheld)")
         from release_management import validate_release_management
         errors.extend(validate_release_management(entry, class_field="policy"))
         normalized.append(entry)
@@ -193,7 +245,7 @@ def docker_snapshot(service: dict) -> dict:
         if len(ids) != 1:
             return {"status": "unverified", "reason": "expected exactly one Compose container"}
         proc = subprocess.run(["docker", "inspect", "--format",
-                               "{{json .}}", ids[0]],
+                               PORTABLE_INSPECT_TEMPLATE, ids[0]],
                               text=True, capture_output=True, timeout=15, check=False)
         if proc.returncode:
             return {"status": "unverified", "reason": "inspect unavailable"}
@@ -256,7 +308,11 @@ def assessment(service: dict, runtime: dict | None) -> dict:
         classification = "BLOCKED"
     else:
         classification = "CANDIDATE"
-    r = runtime or {"status": "not_checked"}
+    r = runtime if isinstance(runtime, dict) else {
+        "status": "not_checked" if runtime is None else "unverified"
+    }
+    if runtime is not None and not isinstance(runtime, dict):
+        issues.append("runtime evidence format invalid")
     if classification == "CANDIDATE" and r.get("status") != "verified":
         issues.append("current runtime not independently verified")
         classification = "BLOCKED"
@@ -387,6 +443,9 @@ def main(argv: list[str] | None = None) -> int:
         if not errors and args.runtime_json:
             evidence = _mapping(json.loads(args.runtime_json.read_text(encoding="utf-8")),
                                 "Runtime evidence")
+            if any(not isinstance(key, str) or not isinstance(value, dict)
+                   for key, value in evidence.items()):
+                raise PolicyError("Synthetic runtime evidence must map service names to mappings")
         if args.operation == "validate":
             result = {"schema_version": POLICY_VERSION, "services": len(services),
                       "valid": not errors, "errors": errors}

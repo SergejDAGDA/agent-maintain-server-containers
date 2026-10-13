@@ -124,7 +124,7 @@ def structure(policy: dict, *, trusted_adapters: dict | None = None) -> tuple[li
     warnings: list[str] = []
     if not isinstance(policy.get("schema"), str) or not re.fullmatch(r"[a-z][a-z0-9-]*-maintenance/v1", policy["schema"]):
         errors.append("unsupported native policy schema")
-    if policy.get("policy_revision") != 1:
+    if type(policy.get("policy_revision")) is not int or policy["policy_revision"] != 1:
         errors.append("unsupported native policy revision")
     for key in sorted(REQUIRED_TOP.difference(policy)):
         errors.append(f"missing policy field: {key}")

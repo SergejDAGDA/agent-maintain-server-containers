@@ -14,6 +14,18 @@ protected independent authority, installed-skill attestation or mutation
 executor. E01–E04 and D01 remain open. Do not infer completion of this
 roadmap from green H31 tests.
 
+## Audit remediation scope (PR #22)
+
+Following [the architecture audit](SECURITY-ARCHITECTURE-AUDIT-2026-10-13.md),
+the final hardening PR strengthens portable-policy extension refusal, strict
+input types and read-only Docker metadata minimization. It does **not** claim
+completion of production restore, distributed witness/anchor authority,
+E01–E04 deterministic mutation execution, D01 installed-tree provenance,
+or backup retention and decommission automation. Before a new public
+release, independently review dependency/toolchain pinning, manifest
+versions, installed-skill artifact digest and true end-to-end application
+pilot scope. The synthetic work remains development-only.
+
 ## Goal and boundaries
 
 Provide an evidence-driven, repeatable lifecycle for Docker Compose applications:
