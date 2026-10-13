@@ -56,7 +56,9 @@ class MonotonicHeadContractTests(unittest.TestCase):
         )
 
     def denied(self, decision, code):
-        self.assertEqual(decision.status, "BLOCKED", decision)
+        expected_status = ("CONFLICT" if code == "publish:compare_and_swap_conflict"
+                           else "BLOCKED")
+        self.assertEqual(decision.status, expected_status, decision)
         self.assertIn(code, decision.blockers)
         self.assertFalse(decision.restore_authorized)
         self.assertFalse(decision.off_host_proven)
@@ -118,7 +120,8 @@ class MonotonicHeadContractTests(unittest.TestCase):
                     "publish:duplicate_or_fork")
 
     def test_wrong_expected_previous_refused(self):
-        self.denied(self.publish(old=A1), "publish:compare_and_swap_conflict")
+        self.denied(self.publish(old=A1, next_anchor=B1),
+                    "publish:compare_and_swap_conflict")
         self.assertEqual(self.journal.current(trusted_min_revision=0).revision, 0)
 
     def test_trusted_revision_floor_refuses_rollback(self):
