@@ -54,6 +54,9 @@ class PublicReleasePackagingTests(unittest.TestCase):
         self.assertIn('.event == "push"', workflow)
         self.assertIn('contents: write', workflow)
         self.assertIn('existing tag points to a different commit', workflow)
+        self.assertIn('git/matching-refs/tags/$RELEASE_TAG', workflow)
+        self.assertIn('select(.ref == $full)', workflow)
+        self.assertNotIn('git/ref/tags/$RELEASE_TAG', workflow)
         self.assertIn('gh release create', workflow)
         self.assertIn('docs/releases/v0.3.0.md', workflow)
 
