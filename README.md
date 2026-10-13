@@ -12,6 +12,17 @@ Invocation: `$maintain-server-containers`
 
 **Status: v0.2.0 (2026-10-12).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
+## Architecture and security audit (13 October 2026)
+
+The reviewed code and synthetic CI through H31 are summarized in the
+[security and architecture audit](docs/SECURITY-ARCHITECTURE-AUDIT-2026-10-13.md).
+The audit confirms a passing read-only v0.2.0 baseline and substantial
+**synthetic** disaster-recovery contract coverage, but **NO-GO** for claiming
+a production mutation executor, independently secured off-host backup, or
+trusted remote monotonic anchor service. This repository update does not
+upgrade any separately installed skill. The next development step is bounded
+input hardening and documentation freeze, not further proof-stack expansion.
+
 ## Why
 
 Routine Docker maintenance is more complex than pulling `latest`. Real deployments may contain persistent accounts, databases, media files, encrypted credentials, externally managed stacks and schema migrations. Upgrading application binaries should not silently replace any of that state.
