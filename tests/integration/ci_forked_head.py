@@ -25,12 +25,13 @@ class SyntheticProcessHead:
     """Mutable fault modes are only for tests; no code loaded from responses."""
 
     def __init__(self, synthetic_private_key, *, anchor_id: str, revision: int,
-                 worker_sha256: str):
+                 worker_sha256: str, now_unix: int):
         self._seed = synthetic_private_key.private_bytes(
             Encoding.Raw, PrivateFormat.Raw, NoEncryption()).hex()
         self.anchor_id = anchor_id
         self.revision = revision
         self.worker_sha256 = worker_sha256
+        self.now_unix = now_unix
         self.mode = "normal"
         self.replay_reply = None
         self._lock = threading.Lock()
@@ -59,21 +60,28 @@ class SyntheticProcessHead:
         if len(raw) > 8192:
             raise OSError("synthetic request exceeded size limit")
         try:
-            proc = subprocess.run(
+            with subprocess.Popen(
                 [sys.executable, "-I", "-B", str(WORKER)],
-                input=raw, capture_output=True, text=True,
-                timeout=2, check=False,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True,
                 env={"PATH": os.environ.get("PATH", ""),
                      "PYTHONHASHSEED": "0"},
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
+            ) as proc:
+                with self._lock:
+                    self.pids_seen.append(proc.pid)
+                try:
+                    stdout, stderr = proc.communicate(input=raw, timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.communicate()
+                    raise OSError("synthetic head child timeout") from None
+                code = proc.returncode
+        except (OSError, subprocess.SubprocessError):
             raise OSError("synthetic head child unavailable") from None
-        with self._lock:
-            self.pids_seen.append(proc.args[3] if len(proc.args) > 3 else "child")
-        if proc.returncode != 0 or len(proc.stdout) > 8192 or len(proc.stderr) > 4096:
+        if code != 0 or len(stdout) > 8192 or len(stderr) > 4096:
             raise OSError("synthetic head child failed or produced oversized reply")
         try:
-            reply = json.loads(proc.stdout)
+            reply = json.loads(stdout)
         except (ValueError, TypeError):
             raise OSError("synthetic malformed child response") from None
         if not isinstance(reply, dict):
