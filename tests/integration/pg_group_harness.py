@@ -60,6 +60,8 @@ from ledger_continuity_contract import (  # noqa: E402
 from ci_pg_inspector import SyntheticPgReadOnlyInspector  # noqa: E402
 from ci_anchor_head import SyntheticCiHeadSource  # noqa: E402
 from ci_forked_head import SyntheticProcessHead, WORKER as HEAD_WORKER  # noqa: E402
+from ci_monotonic_fixture import bootstrap_test_only  # noqa: E402
+from monotonic_head_contract import SyntheticMonotonicJournal  # noqa: E402
 from current_anchor_source_contract import (  # noqa: E402
     ReviewedHeadReader, ReviewedHeadSource,
 )
@@ -830,6 +832,114 @@ def run() -> None:
             if (foreign.status != "BLOCKED"
                     or "head:invalid_source_signature" not in foreign.blockers):
                 raise RuntimeError("foreign child signing key was trusted")
+        # H30: synthetic monotonic head publication across two separate
+        # Python processes, racing against the same expected previous head.
+        # All state is under this ephemeral run-owned sandbox, NOT a remote
+        # independent latest-anchor authority.
+        cas_path = sandbox / "ci-monotonic-heads.sqlite"
+        store_id = secrets.token_hex(32)
+        with sqlite3.connect(cas_path) as cas_db:
+            bootstrap_test_only(
+                cas_db, ledger_id="ci-witness-ledger",
+                store_id=store_id, genesis_anchor=current_anchor_id,
+            )
+            cas = SyntheticMonotonicJournal(
+                cas_db, ledger_id="ci-witness-ledger",
+                expected_store_id=store_id,
+                expected_genesis_anchor=current_anchor_id,
+            )
+            initial = cas.current(trusted_min_revision=0)
+            if initial.status != "OBSERVED_LOCAL" or initial.revision != 0:
+                raise RuntimeError("synthetic monotonic genesis not readable")
+            old_cas_path = sandbox / "old-cas.sqlite"
+            with sqlite3.connect(old_cas_path) as old_cas:
+                cas_db.backup(old_cas)
+
+        def run_cas_child(next_anchor, expected_rev, previous, minimum):
+            request = {
+                "path": str(cas_path), "ledger_id": "ci-witness-ledger",
+                "store_id": store_id, "genesis": current_anchor_id,
+                "expected_revision": expected_rev,
+                "expected_anchor": previous,
+                "next_revision": expected_rev + 1,
+                "next_anchor": next_anchor,
+                "minimum_revision": minimum,
+            }
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-I", "-B",
+                     str(HERE / "ci_monotonic_child.py")],
+                    input=json.dumps(request), capture_output=True,
+                    text=True, timeout=15, check=False,
+                    env={"PATH": os.environ.get("PATH", ""),
+                         "MSC_DISPOSABLE_TEST_RUNNER": "isolated-ci-fixture-v1"},
+                )
+                if (result.returncode != 0 or len(result.stdout) > 2048
+                        or result.stderr or not result.stdout):
+                    raise RuntimeError("synthetic monotonic process failed")
+                response = json.loads(result.stdout)
+                if (not isinstance(response, dict)
+                        or set(response) != {"status", "blockers"}):
+                    raise RuntimeError("synthetic monotonic process malformed reply")
+                return response["status"]
+            except (OSError, subprocess.SubprocessError, ValueError) as exc:
+                raise RuntimeError("synthetic monotonic child unavailable") from exc
+
+        competing = (secrets.token_hex(32), secrets.token_hex(32))
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            pending = [executor.submit(run_cas_child, anchor, 0,
+                                       current_anchor_id, 0)
+                       for anchor in competing]
+            outcomes = sorted(p.result() for p in pending)
+        if outcomes != ["CONFLICT", "PUBLISHED_LOCAL"]:
+            raise RuntimeError("simultaneous children published two monotonic heads")
+        with sqlite3.connect(cas_path) as cas_db:
+            cas = SyntheticMonotonicJournal(
+                cas_db, ledger_id="ci-witness-ledger",
+                expected_store_id=store_id,
+                expected_genesis_anchor=current_anchor_id,
+            )
+            current_cas = cas.current(trusted_min_revision=1)
+            if (current_cas.status != "OBSERVED_LOCAL"
+                    or current_cas.anchor_id not in competing
+                    or current_cas.revision != 1):
+                raise RuntimeError("synthetic CAS head diverged after collision")
+        # Restart the writer process and publish only revision 2 from the
+        # actual committed version, never from the original expected state.
+        if run_cas_child(secrets.token_hex(32), 0, current_anchor_id, 1) != "CONFLICT":
+            raise RuntimeError("stale restarted CAS process unexpectedly published")
+        revision_two_anchor = secrets.token_hex(32)
+        if run_cas_child(revision_two_anchor, 1, current_cas.anchor_id, 1) != "PUBLISHED_LOCAL":
+            raise RuntimeError("restarted CAS process could not append revision")
+        with sqlite3.connect(cas_path) as latest_cas:
+            reader = SyntheticMonotonicJournal(
+                latest_cas, ledger_id="ci-witness-ledger",
+                expected_store_id=store_id,
+                expected_genesis_anchor=current_anchor_id,
+            )
+            after_restart = reader.current(trusted_min_revision=2)
+            if (after_restart.status != "OBSERVED_LOCAL"
+                    or after_restart.revision != 2
+                    or after_restart.anchor_id != revision_two_anchor):
+                raise RuntimeError("synthetic CAS revision 2 not retained")
+        with sqlite3.connect(old_cas_path) as previous_cas:
+            old_reader = SyntheticMonotonicJournal(
+                previous_cas, ledger_id="ci-witness-ledger",
+                expected_store_id=store_id,
+                expected_genesis_anchor=current_anchor_id,
+            )
+            if old_reader.current(trusted_min_revision=2).status != "BLOCKED":
+                raise RuntimeError("old CAS database accepted despite trusted revision floor")
+        with sqlite3.connect(sandbox / "missing-head-state.sqlite") as missing_state:
+            missing_reader = SyntheticMonotonicJournal(
+                missing_state, ledger_id="ci-witness-ledger",
+                expected_store_id=store_id,
+                expected_genesis_anchor=current_anchor_id,
+            )
+            if missing_reader.current(trusted_min_revision=2).status != "BLOCKED":
+                raise RuntimeError("deleted CAS store implicitly recreated")
+        print("H30 PASS two synthetic process writers CAS conflict, "
+              "revision-2 restart, rollback and lost-store refusal", flush=True)
         print("H29 PASS two process-separated signed head replies; "
               "crash/foreign-key refusal and separate worker PIDs", flush=True)
         print("H28 PASS signed reviewed head-source challenge, outage/replay refusal, "
