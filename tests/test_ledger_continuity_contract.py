@@ -234,6 +234,14 @@ class LedgerContinuityContractTests(unittest.TestCase):
         self.connection.commit()
         self.denied(signed, "continuity:unreadable_or_invalid_ledger")
 
+    def test_closed_connection_is_blocked_not_exception(self):
+        signed = self.anchor()
+        self.connection.close()
+        state = read_ledger_state(self.connection)
+        self.assertFalse(state.valid)
+        self.assertIn("continuity:unreadable_or_invalid_ledger", state.blockers)
+        self.denied(signed, "continuity:unreadable_or_invalid_ledger")
+
     def test_memory_database_denied(self):
         with sqlite3.connect(":memory:") as memory:
             self.assertIn("continuity:nonpersistent_ledger",
