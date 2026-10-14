@@ -14,6 +14,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "skills" / "maintain-server-cont
 sys.path.insert(0, str(SCRIPTS))
 import compose_preflight  # noqa: E402
 import doctor  # noqa: E402
+import maintenance  # noqa: E402
 
 
 class AcceptancePreflightTests(unittest.TestCase):
@@ -44,6 +45,40 @@ class AcceptancePreflightTests(unittest.TestCase):
             status = doctor.check_dependencies()
         self.assertTrue(status["json_policy_ready"])
         self.assertFalse(status["yaml_policy_ready"])
+
+    def test_yaml_missing_dependency_error_does_not_suggest_server_install(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "services.yaml"
+            path.write_text("services: []\n", encoding="utf-8")
+            with patch.dict(sys.modules, {"yaml": None}):
+                with self.assertRaises(maintenance.PolicyError) as caught:
+                    maintenance.load_policy(path)
+        self.assertIn("doctor.py", str(caught.exception))
+        self.assertNotIn("pip install", str(caught.exception))
+
+    def test_doctor_cli_json_readiness_requires_field_check(self):
+        with patch.object(doctor.importlib.util, "find_spec", return_value=None), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            exit_code = doctor.main(["--format", "json"])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 2)
+        self.assertTrue(payload["json_policy_ready"])
+        self.assertFalse(payload["yaml_policy_ready"])
+
+    def test_compose_presence_cli_exit_zero_is_not_render_proof(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "compose.yaml"
+            p.write_text("services: {}\n", encoding="utf-8")
+            with patch.object(compose_preflight.subprocess, "run",
+                              side_effect=AssertionError("Docker must not run")), \
+                 contextlib.redirect_stdout(io.StringIO()) as output:
+                exit_code = compose_preflight.main(["--file", str(p), "--format", "json"])
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["status"], "FILES_PRESENT_NOT_RENDER_VERIFIED")
+        self.assertFalse(payload["source_reproducible"])
+        self.assertFalse(payload["runtime_state_verified"])
+        self.assertFalse(payload["update_authorized"])
 
     def test_missing_compose_file_blocks_before_docker(self):
         with tempfile.TemporaryDirectory() as d:

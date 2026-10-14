@@ -2,6 +2,10 @@
 
 ## Unreleased — initial real-world acceptance improvements
 
+- Reconcile YAML dependency guidance and the CLI error with noninstalling read-only preflight.
+- Clarify doctor/Compose machine status and exit-code semantics, and require an agent-level runtime-to-policy coverage summary without an extra scanner.
+- Fix synthetic SQLite handle lifetime, portable Restic fixture paths, and UTF-8 reads so offline Windows tests expose genuine regressions rather than cleanup/encoding failures.
+
 - Add a stdlib-only, noninstalling `doctor.py` to verify the exact
   interpreter can run the YAML validator; require a local reviewed venv
   rather than installing PyYAML on the inspected server.

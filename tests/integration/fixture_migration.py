@@ -5,6 +5,8 @@ The simulated process crash occurs strictly AFTER its transaction commits.
 """
 from __future__ import annotations
 
+from contextlib import closing
+
 import hashlib
 import sqlite3
 from pathlib import Path
@@ -33,7 +35,7 @@ def migrate_v2_then_interrupt(root: Path) -> None:
     """Commit a schema that the v1 application cannot read, then fail."""
     root = _approved(root)
     verify_state(root)
-    with sqlite3.connect(root / DB_NAME, timeout=5) as con:
+    with closing(sqlite3.connect(root / DB_NAME, timeout=5)) as con, con:
         if con.execute("PRAGMA user_version").fetchone() != (0,):
             raise ValueError("REFUSED: synthetic baseline schema not v1")
         con.execute("ALTER TABLE attachment RENAME TO document_blob")
@@ -46,7 +48,7 @@ def migrate_v2_then_interrupt(root: Path) -> None:
 def verify_v2(root: Path, *, expected: dict) -> str:
     """Read-only independent check of v2 rows, files, and unchanged identity."""
     root = _approved(root)
-    with sqlite3.connect((root / DB_NAME).as_uri() + "?mode=ro", uri=True) as con:
+    with closing(sqlite3.connect((root / DB_NAME).as_uri() + "?mode=ro", uri=True)) as con:
         con.execute("PRAGMA query_only=ON")
         if con.execute("PRAGMA quick_check").fetchone() != ("ok",):
             raise ValueError("synthetic migrated database is corrupt")

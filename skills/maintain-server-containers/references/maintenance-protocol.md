@@ -51,6 +51,22 @@ Do not mistake absent healthchecks for a healthy application. Presence
 of Restic snapshots means only snapshot metadata exists unless
 application-consistent restore has been proven independently.
 
+## Coverage and CLI outcome interpretation
+
+For a real-host read-only audit, record the denominator (all discovered
+Compose projects and containers), policy matches, unlabelled/unmanaged
+runtime, unmatched policy entries, external-admin objects and incomplete
+groups. Mark unverified counts `NOT VERIFIED`, not zero, and report a
+coverage-complete/incomplete conclusion. This is an **agent report**
+rather than a new schema or automatic all-host scanner.
+
+`doctor.py` exit code 2 is specifically YAML-unready. Check
+`json_policy_ready` for JSON policies. `compose_preflight.py` exit 0
+can mean only `FILES_PRESENT_NOT_RENDER_VERIFIED`, with
+`source_reproducible=false`. Use the machine `status`, `blockers`
+and booleans together, and keep agent findings such as
+`SOURCE_NONREPRODUCIBLE` distinct. Neither program authorizes an update.
+
 ## Plan and authorization boundary
 
 A plan names exact service/group, immutable current identity, target version and intended digest, expected runtime mutations, backup/restore boundary and smoke procedure. It must list exclusions. A single user's instruction to update eligible services permits the bounded actions described in that plan but does not grant permission for other projects or speculative migrations.

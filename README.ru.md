@@ -112,10 +112,10 @@ skills/maintain-server-containers/
 
 Для Codex каталог помещается в предусмотренное расположение пользовательских или проектных навыков. Для Claude Code предусмотрены plugin-манифест и совместимая структура. Конкретные шаги установки зависят от актуальной версии агента.
 
-Для локального валидатора нужны Python 3.10+ и PyYAML:
+Требуется Python 3.10+. Перед YAML-проверкой запустите `doctor.py` тем же интерпретатором, что и `maintenance.py`. Используйте уже подготовленное локальное окружение с PyYAML. Для JSON policy PyYAML не нужен. Во время read-only аудита нельзя устанавливать зависимости на обследуемый сервер.
 
 ```sh
-python -m pip install -r skills/maintain-server-containers/scripts/requirements.txt
+python skills/maintain-server-containers/scripts/doctor.py --format json
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml validate
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml plan
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml validate

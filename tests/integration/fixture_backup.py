@@ -5,6 +5,8 @@ Database capture uses sqlite3.Connection.backup (rather than copying a live WAL)
 """
 from __future__ import annotations
 
+from contextlib import closing
+
 import hashlib
 import json
 import os
@@ -55,7 +57,7 @@ def seed_fixture(root: Path) -> dict:
         (root / "attachments" / filename).write_bytes(payload)
         files.append((filename, hashlib.sha256(payload).hexdigest()))
     db = root / DB_NAME
-    with sqlite3.connect(db) as con:
+    with closing(sqlite3.connect(db)) as con, con:
         con.execute("PRAGMA journal_mode=WAL")
         con.execute("CREATE TABLE fixture_identity (identifier TEXT NOT NULL)")
         con.execute("CREATE TABLE attachment (name TEXT PRIMARY KEY, digest TEXT NOT NULL)")
@@ -104,7 +106,8 @@ def capture_fixture(state: Path, checkpoint: Path) -> dict:
         # Online-consistent SQLite DB snapshot; never copy only database.sqlite
         # from a live WAL writer. This controlled fixture has no concurrent
         # attachment writers; a generic provider needs a coordinated boundary.
-        with sqlite3.connect(state / DB_NAME) as source, sqlite3.connect(staging / DB_NAME) as target:
+        with closing(sqlite3.connect(state / DB_NAME)) as source, \
+             closing(sqlite3.connect(staging / DB_NAME)) as target:
             source.backup(target)
         for rel in _paths(state)[2:]:
             shutil.copyfile(state / rel, staging / rel)

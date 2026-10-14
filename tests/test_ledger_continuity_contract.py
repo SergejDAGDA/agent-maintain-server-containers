@@ -1,6 +1,8 @@
 """Only synthetic local SQLite and temporary Ed25519 keys, no real services."""
 from __future__ import annotations
 
+from contextlib import closing
+
 import copy
 import hashlib
 import json
@@ -126,13 +128,13 @@ class LedgerContinuityContractTests(unittest.TestCase):
 
     def test_rollback_to_previous_sqlite_rejected_with_latest_anchor(self):
         old_path = self.root / "old.sqlite"
-        with sqlite3.connect(old_path) as previous:
+        with closing(sqlite3.connect(old_path)) as previous, previous:
             self.connection.backup(previous)
         old_anchor = self.anchor(nonce="1")
         self.assertTrue(self.ledger.revoke("witness", "test-witness"))
         newest_anchor = self.anchor(nonce="2")
         current_pin = self.anchor_id(newest_anchor)
-        with sqlite3.connect(old_path) as rolled_back:
+        with closing(sqlite3.connect(old_path)) as rolled_back, rolled_back:
             self.denied(newest_anchor, "continuity:ledger_state_mismatch",
                         connection=rolled_back, expected_id=current_pin)
             self.denied(old_anchor, "continuity:not_latest_external_anchor",
@@ -142,7 +144,7 @@ class LedgerContinuityContractTests(unittest.TestCase):
 
     def test_foreign_database_same_structure_does_not_match(self):
         foreign_path = self.root / "foreign.sqlite"
-        with sqlite3.connect(foreign_path) as foreign:
+        with closing(sqlite3.connect(foreign_path)) as foreign, foreign:
             DurableWitnessLedger(foreign)
             foreign.execute(
                 "INSERT INTO witness_used VALUES (?,?,?,?)",
@@ -243,7 +245,7 @@ class LedgerContinuityContractTests(unittest.TestCase):
         self.denied(signed, "continuity:unreadable_or_invalid_ledger")
 
     def test_memory_database_denied(self):
-        with sqlite3.connect(":memory:") as memory:
+        with closing(sqlite3.connect(":memory:")) as memory, memory:
             self.assertIn("continuity:nonpersistent_ledger",
                           read_ledger_state(memory).blockers)
 

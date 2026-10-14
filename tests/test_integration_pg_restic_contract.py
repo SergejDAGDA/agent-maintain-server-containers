@@ -66,7 +66,7 @@ class PgResticOfflineTests(unittest.TestCase):
             if args[0] == "restore":
                 source = self.package
                 target = Path(args[args.index("--target") + 1])
-                shutil.copytree(source, target / source.relative_to("/"))
+                shutil.copytree(source, target / source.relative_to(source.anchor))
                 return ""
             raise AssertionError("unexpected Restic operation")
 
@@ -119,8 +119,8 @@ class PgResticOfflineTests(unittest.TestCase):
             if args[0] == "restore":
                 src = self.package
                 target = Path(args[args.index("--target") + 1])
-                shutil.copytree(src, target / src.relative_to("/"))
-                (target / src.relative_to("/") / "pg.dump").write_bytes(b"corrupt")
+                shutil.copytree(src, target / src.relative_to(src.anchor))
+                (target / src.relative_to(src.anchor) / "pg.dump").write_bytes(b"corrupt")
                 return ""
             raise AssertionError("unexpected")
         with mock.patch.object(self.provider, "_call", side_effect=fake_call):
