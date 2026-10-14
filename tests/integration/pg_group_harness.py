@@ -20,6 +20,7 @@ import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -69,6 +70,17 @@ from current_anchor_source_contract import (  # noqa: E402
 from trusted_inspector_registry import (  # noqa: E402
     ReviewedInspector, ReviewedInspectorRegistry,
 )
+
+
+@contextmanager
+def _managed_sqlite(*args, **kwargs):
+    """Own a disposable SQLite connection with transaction and handle cleanup.
+
+    sqlite3.Connection.__exit__ commits/rolls back but does not close files.
+    """
+    with closing(sqlite3.connect(*args, **kwargs)) as connection:
+        with connection:
+            yield connection
 
 
 def _checksum(data: bytes) -> str:
@@ -704,7 +716,7 @@ def run() -> None:
             return ({"statement": statement, "signature": anchor_key.sign(raw).hex()},
                     hashlib.sha256(raw).hexdigest())
 
-        with sqlite3.connect(ledger_path) as current_ledger:
+        with _managed_sqlite(ledger_path) as current_ledger:
             current_state = read_ledger_state(current_ledger)
             if not current_state.valid or current_state.revoked_count != 1:
                 raise RuntimeError("synthetic revocation state not readable")
@@ -720,7 +732,7 @@ def run() -> None:
                     or latest.off_host_proven):
                 raise RuntimeError("synthetic current ledger anchor not verified")
 
-        with sqlite3.connect(old_ledger_path) as old_ledger:
+        with _managed_sqlite(old_ledger_path) as old_ledger:
             old_state = read_ledger_state(old_ledger)
             if not old_state.valid or old_state.revoked_count != 0:
                 raise RuntimeError("synthetic pre-revocation ledger missing")
@@ -768,7 +780,7 @@ def run() -> None:
                                      current_state.revoked_count,
             )
 
-        with sqlite3.connect(ledger_path) as current_ledger:
+        with _managed_sqlite(ledger_path) as current_ledger:
             matched = evaluate_head(current_ledger)
             if (matched.status != "SIGNED_SOURCE_CLAIM_MATCHED"
                     or matched.restore_authorized or matched.off_host_proven):
@@ -783,7 +795,7 @@ def run() -> None:
             if replay.status != "BLOCKED" or "head:challenge_mismatch" not in replay.blockers:
                 raise RuntimeError("synthetic head-source reply replay not refused")
             responder.replay = False
-        with sqlite3.connect(old_ledger_path) as rolled_back:
+        with _managed_sqlite(old_ledger_path) as rolled_back:
             old_db = evaluate_head(rolled_back)
             if (old_db.status != "BLOCKED"
                     or "continuity:ledger_state_mismatch" not in old_db.blockers):
@@ -813,7 +825,7 @@ def run() -> None:
                                      current_state.revoked_count,
             )
         def concurrent_request(_index):
-            with sqlite3.connect(ledger_path) as database:
+            with _managed_sqlite(ledger_path) as database:
                 return verify_child_head(database)
         with ThreadPoolExecutor(max_workers=2) as executor:
             parallel = list(executor.map(concurrent_request, range(2)))
@@ -822,7 +834,7 @@ def run() -> None:
                 for item in parallel)
                 or len(set(forked.pids_seen)) != 2):
             raise RuntimeError("process-separated CI signed head reads did not agree")
-        with sqlite3.connect(ledger_path) as database:
+        with _managed_sqlite(ledger_path) as database:
             forked.mode = "crash"
             crashed = verify_child_head(database)
             if (crashed.status != "BLOCKED"
@@ -839,7 +851,7 @@ def run() -> None:
         # independent latest-anchor authority.
         cas_path = sandbox / "ci-monotonic-heads.sqlite"
         store_id = secrets.token_hex(32)
-        with sqlite3.connect(cas_path) as cas_db:
+        with _managed_sqlite(cas_path) as cas_db:
             bootstrap_test_only(
                 cas_db, ledger_id="ci-witness-ledger",
                 store_id=store_id, genesis_anchor=current_anchor_id,
@@ -853,7 +865,7 @@ def run() -> None:
             if initial.status != "OBSERVED_LOCAL" or initial.revision != 0:
                 raise RuntimeError("synthetic monotonic genesis not readable")
             old_cas_path = sandbox / "old-cas.sqlite"
-            with sqlite3.connect(old_cas_path) as old_cas:
+            with _managed_sqlite(old_cas_path) as old_cas:
                 cas_db.backup(old_cas)
 
         def run_cas_child(next_anchor, expected_rev, previous, minimum):
@@ -894,7 +906,7 @@ def run() -> None:
             outcomes = sorted(p.result() for p in pending)
         if outcomes != ["CONFLICT", "PUBLISHED_LOCAL"]:
             raise RuntimeError("simultaneous children published two monotonic heads")
-        with sqlite3.connect(cas_path) as cas_db:
+        with _managed_sqlite(cas_path) as cas_db:
             cas = SyntheticMonotonicJournal(
                 cas_db, ledger_id="ci-witness-ledger",
                 expected_store_id=store_id,
@@ -912,7 +924,7 @@ def run() -> None:
         revision_two_anchor = secrets.token_hex(32)
         if run_cas_child(revision_two_anchor, 1, current_cas.anchor_id, 1) != "PUBLISHED_LOCAL":
             raise RuntimeError("restarted CAS process could not append revision")
-        with sqlite3.connect(cas_path) as latest_cas:
+        with _managed_sqlite(cas_path) as latest_cas:
             reader = SyntheticMonotonicJournal(
                 latest_cas, ledger_id="ci-witness-ledger",
                 expected_store_id=store_id,
@@ -923,7 +935,7 @@ def run() -> None:
                     or after_restart.revision != 2
                     or after_restart.anchor_id != revision_two_anchor):
                 raise RuntimeError("synthetic CAS revision 2 not retained")
-        with sqlite3.connect(old_cas_path) as previous_cas:
+        with _managed_sqlite(old_cas_path) as previous_cas:
             old_reader = SyntheticMonotonicJournal(
                 previous_cas, ledger_id="ci-witness-ledger",
                 expected_store_id=store_id,
@@ -931,7 +943,7 @@ def run() -> None:
             )
             if old_reader.current(trusted_min_revision=2).status != "BLOCKED":
                 raise RuntimeError("old CAS database accepted despite trusted revision floor")
-        with sqlite3.connect(sandbox / "missing-head-state.sqlite") as missing_state:
+        with _managed_sqlite(sandbox / "missing-head-state.sqlite") as missing_state:
             missing_reader = SyntheticMonotonicJournal(
                 missing_state, ledger_id="ci-witness-ledger",
                 expected_store_id=store_id,
@@ -946,20 +958,20 @@ def run() -> None:
         if source.exists() or containers(original_project):
             raise RuntimeError("source-loss prerequisite for H31 not met")
         assert_group(restored_ids, restored, seed)
-        with sqlite3.connect(ledger_path) as previously_used:
+        with _managed_sqlite(ledger_path) as previously_used:
             witness_ledger = DurableWitnessLedger(previously_used)
             if witness_ledger.is_current(signed.attestation_id,
                                          now_unix=int(time.time())):
                 raise RuntimeError("revoked witness receipt became current again")
         chain_store_id = secrets.token_hex(32)
         chain_store_path = sandbox / "ci-h31-monotonic-chain.sqlite"
-        with sqlite3.connect(chain_store_path) as chain_new:
+        with _managed_sqlite(chain_store_path) as chain_new:
             bootstrap_test_only(
                 chain_new, ledger_id="ci-witness-ledger",
                 store_id=chain_store_id, genesis_anchor=current_anchor_id,
             )
             chain_snapshot = sandbox / "ci-h31-older-head.sqlite"
-            with sqlite3.connect(chain_snapshot) as copy:
+            with _managed_sqlite(chain_snapshot) as copy:
                 chain_new.backup(copy)
 
         def check_h31(ledger_db, cas_db, *, current_envelope,
@@ -988,9 +1000,9 @@ def run() -> None:
 
         def run_h31(*, current_envelope=None, head_id=None,
                     minimum_revision=0, ledger_file=None, cas_file=None):
-            with sqlite3.connect(
+            with _managed_sqlite(
                 ledger_file if ledger_file is not None else ledger_path
-            ) as ledger_db, sqlite3.connect(
+            ) as ledger_db, _managed_sqlite(
                 cas_file if cas_file is not None else chain_store_path
             ) as cas_db:
                 return check_h31(
@@ -1041,7 +1053,7 @@ def run() -> None:
         # ledger state through the disposable CAS. Old anchor becomes stale.
         new_h31_envelope, new_h31_id = make_anchor(
             current_state, secrets.token_hex(32))
-        with sqlite3.connect(chain_store_path) as chain_db:
+        with _managed_sqlite(chain_store_path) as chain_db:
             chain = SyntheticMonotonicJournal(
                 chain_db, ledger_id="ci-witness-ledger",
                 expected_store_id=chain_store_id,

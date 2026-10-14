@@ -59,12 +59,12 @@ version; do not guess where the installed skill currently lives.
    are present in the **same installed skill folder**.
 4. The standalone source checkout passes:
    ```sh
-   python -m pip install -r skills/maintain-server-containers/scripts/requirements.txt
+   python skills/maintain-server-containers/scripts/doctor.py --format json
    python -m unittest discover -s tests -v
    python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml validate
    python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml validate
    ```
-   Prefer an isolated virtual environment for package installation.
+   For YAML policies, use an existing reviewed local virtual environment with PyYAML. A controlled, explicitly approved local test-environment setup may install the declared requirements separately. Never install packages on the inspected server as a side effect of read-only acceptance. For JSON policies, check `json_policy_ready` even if doctor returns 2 for YAML readiness.
 5. Restart the Codex session if skill discovery does not refresh. Invoke
    `$maintain-server-containers` first with a **read-only** request.
 

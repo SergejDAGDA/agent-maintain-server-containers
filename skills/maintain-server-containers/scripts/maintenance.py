@@ -88,7 +88,7 @@ def load_policy(path: Path) -> dict:
         try:
             import yaml
         except ImportError as exc:
-            raise PolicyError("YAML policy requires PyYAML (pip install -r requirements.txt)") from exc
+            raise PolicyError("YAML policy requires PyYAML in the selected Python. Run doctor.py with that interpreter and use an existing reviewed local environment. Do not install packages on the inspected server for a read-only audit") from exc
         try:
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
         except (yaml.YAMLError, UnicodeError) as exc:

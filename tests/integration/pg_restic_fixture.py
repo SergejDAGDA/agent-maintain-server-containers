@@ -76,7 +76,7 @@ class PgResticFixture(ResticFixture):
         if target.exists() or target.is_symlink():
             raise ResticFixtureError("REFUSED: PostgreSQL restore target already exists")
         self._call(["restore", sid, "--target", str(target)])
-        recovered = target / source.relative_to("/")
+        recovered = target / source.relative_to(source.anchor)
         if (not recovered.is_dir() or recovered.is_symlink()
                 or not recovered.resolve().is_relative_to(target.resolve())):
             raise ResticFixtureError("REFUSED: restored PostgreSQL set invalid")

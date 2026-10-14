@@ -1,6 +1,8 @@
 """Offline current-anchor head contract. Synthetic keys, sqlite and source only."""
 from __future__ import annotations
 
+from contextlib import closing
+
 import copy
 import hashlib
 import sqlite3
@@ -223,13 +225,13 @@ class CurrentAnchorHeadTests(unittest.TestCase):
 
     def test_rolled_back_sqlite_denied_against_fresh_signed_head(self):
         previous = Path(self.temp.name) / "old.sqlite"
-        with sqlite3.connect(previous) as old:
+        with closing(sqlite3.connect(previous)) as old, old:
             self.connection.backup(old)
         self.assertTrue(self.ledger.revoke("key", "synthetic-w:key-1"))
         self.make_anchor()
         self.source.anchor_id = self.anchor_id
         self.source.revision = self.revision
-        with sqlite3.connect(previous) as rolled_back:
+        with closing(sqlite3.connect(previous)) as rolled_back, rolled_back:
             self.blocked("continuity:ledger_state_mismatch", connection=rolled_back)
 
     def test_current_sqlite_plus_old_source_id_refused(self):

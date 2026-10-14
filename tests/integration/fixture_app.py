@@ -4,6 +4,8 @@ Can run from the host for unit tests or within a read-only Compose service.
 """
 from __future__ import annotations
 
+from contextlib import closing
+
 import argparse
 import hashlib
 import re
@@ -25,7 +27,7 @@ def verify_state(root: Path) -> dict[str, str | int]:
     if not db.is_file():
         raise ValueError("fixture database missing")
     # Opening readonly prevents a healthcheck from mutating the DB state.
-    with sqlite3.connect(db.as_uri() + "?mode=ro", uri=True, timeout=2) as con:
+    with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True, timeout=2)) as con:
         con.execute("PRAGMA query_only=ON")
         if con.execute("PRAGMA quick_check").fetchone() != ("ok",):
             raise ValueError("SQLite integrity check failed")

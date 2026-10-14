@@ -1,6 +1,8 @@
 """Experimental monotonic journal synthetic tests, all temporary files only."""
 from __future__ import annotations
 
+from contextlib import closing
+
 import shutil
 import sqlite3
 import sys
@@ -83,7 +85,7 @@ class MonotonicHeadContractTests(unittest.TestCase):
     def test_concurrent_writers_only_one_success_one_conflict(self):
         barrier = Barrier(3)
         def attempt(anchor):
-            with sqlite3.connect(self.path, timeout=10) as connection:
+            with closing(sqlite3.connect(self.path, timeout=10)) as connection, connection:
                 writer = self.reader(connection)
                 barrier.wait(timeout=8)
                 return self.publish(via=writer, next_anchor=anchor).status
@@ -99,7 +101,7 @@ class MonotonicHeadContractTests(unittest.TestCase):
 
     def test_no_two_heads_at_same_revision_even_with_racing_retry(self):
         self.assertEqual(self.publish().status, "PUBLISHED_LOCAL")
-        with sqlite3.connect(self.path) as another:
+        with closing(sqlite3.connect(self.path)) as another, another:
             other = self.reader(another)
             result = self.publish(via=other, next_anchor=B1)
             self.denied(result, "publish:compare_and_swap_conflict")
@@ -141,10 +143,10 @@ class MonotonicHeadContractTests(unittest.TestCase):
 
     def test_rolled_back_sqlite_refused_against_trusted_floor(self):
         older = Path(self.temp.name) / "previous.sqlite"
-        with sqlite3.connect(older) as copy:
+        with closing(sqlite3.connect(older)) as copy, copy:
             self.db.backup(copy)
         self.assertEqual(self.publish().status, "PUBLISHED_LOCAL")
-        with sqlite3.connect(older) as rollback:
+        with closing(sqlite3.connect(older)) as rollback, rollback:
             stale = self.reader(rollback)
             self.denied(stale.current(trusted_min_revision=1),
                         "publish:below_trusted_minimum")
@@ -153,7 +155,7 @@ class MonotonicHeadContractTests(unittest.TestCase):
 
     def test_missing_database_cannot_be_trusted_without_bootstrap(self):
         lost = Path(self.temp.name) / "missing.sqlite"
-        with sqlite3.connect(lost) as fresh:
+        with closing(sqlite3.connect(lost)) as fresh, fresh:
             empty = self.reader(fresh)
             self.denied(empty.current(trusted_min_revision=0),
                         "publish:invalid_or_unavailable_store")
@@ -161,7 +163,7 @@ class MonotonicHeadContractTests(unittest.TestCase):
                         "publish:invalid_or_unavailable_store")
 
     def test_cloned_database_with_wrong_store_identity_refused(self):
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
             other = self.reader(connection, store="f" * 64)
             self.denied(other.current(trusted_min_revision=0),
                         "publish:invalid_or_unavailable_store")

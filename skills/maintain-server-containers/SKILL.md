@@ -33,7 +33,7 @@ If the user's intent is ambiguous, start with `audit`. Do not interpret "look at
 
 ## Deterministic read-only helper
 
-Install dependency `PyYAML` (unless using JSON policies) and run:
+Before YAML validation, run `scripts/doctor.py --format json` using the **same Python interpreter** as `maintenance.py`. Use an existing reviewed local environment with PyYAML, or use a JSON policy (which needs no PyYAML). During a read-only audit, do not install dependencies on the inspected server. Then run:
 
 ```sh
 python skills/maintain-server-containers/scripts/maintenance.py --policy maintenance/services.yaml validate
@@ -106,6 +106,47 @@ For an existing deployment or the first audit of a remote host:
 The portable helper audits one uniquely identified Compose service at a
 time; a complete topology/source comparison remains an explicit agent task.
 Do not treat a successful preflight or dependency check as update authority.
+
+### Read-only inventory coverage summary
+
+Every real-host `audit` must report the complete discovered runtime scope, not
+only services matched by the bundled helper. Include a compact table with:
+
+- discovered Compose projects and discovered containers (counts);
+- policy-matched projects/services and unmatched policy records (counts or `NOT VERIFIED`);
+- runtime services missing policy and unlabelled containers (count and identity or `NOT VERIFIED`);
+- external administrator objects, including `EXTERNAL_ADMIN / NO_TOUCH`;
+- incomplete component/group identities and cross-project dependencies;
+- source reproducibility by project (`SOURCE_NONREPRODUCIBLE` or evidence status);
+- whether coverage is complete, with unexplained discrepancies called out;
+- update authorization separately from all checks. A read-only audit does not authorize changes.
+
+Never use zero as a substitute for an unknown count. A missing runtime/policy
+match does not mean a resource is absent. The Python helper only examines an
+explicitly identified Compose service, so the agent must perform and report
+the wider reconciliation using previously authorized read-only inspection.
+
+### Result levels and exit codes
+
+Keep these levels distinct instead of inventing equivalent CLI statuses:
+
+- `doctor.py` returns readiness fields `yaml_policy_ready` and
+  `json_policy_ready`. Its exit code 2 means the **YAML** validation path
+  is unavailable. An otherwise supported JSON policy may still be validated,
+  but callers must inspect `json_policy_ready`, not treat exit 2 as a
+  global policy-format failure.
+- `compose_preflight.py` returns machine `status`, `blockers`, and
+  booleans. `FILES_PRESENT_NOT_RENDER_VERIFIED` returns exit 0 because
+  file-presence inspection completed, but `source_reproducible=false` and
+  `update_authorized=false`. `SOURCE_RENDERED_LOCAL_ONLY` proves only
+  the local quiet render. `BLOCKED` returns exit 2.
+- `VALIDATOR_DEPENDENCY_MISSING`, `SOURCE_NONREPRODUCIBLE`,
+  `GROUP_IDENTITY_INCOMPLETE`, and `UNMANAGED / NOT ELIGIBLE` are
+  **agent-level findings**, not new machine statuses. Translate CLI
+  results into findings with the underlying evidence.
+- A process exit code or a passing local preflight must never be used
+  alone as proof of remote runtime parity, restore capability, or
+  update authorization.
 
 ## Update policy
 

@@ -115,10 +115,10 @@ For Codex, place that directory in the configured user or project skills locatio
 
 ### Set up the CLI
 
-Python 3.10+ and PyYAML for YAML policies:
+Python 3.10+ is required. For YAML policies, first check PyYAML in the **same** Python interpreter using the noninstalling doctor. Reuse an existing reviewed local environment. JSON policies do not need PyYAML. Do not install dependencies on an inspected server for a read-only audit.
 
 ```sh
-python -m pip install -r skills/maintain-server-containers/scripts/requirements.txt
+python skills/maintain-server-containers/scripts/doctor.py --format json
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml validate
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/services.yaml plan
 python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml validate
