@@ -32,7 +32,7 @@ class PublicReleasePackagingTests(unittest.TestCase):
     def test_codex_update_uses_published_tag_only(self):
         guide = (ROOT / "docs/CODEX-INSTALL-UPDATE.md").read_text(encoding="utf-8")
         self.assertIn("tree/v0.4.0/skills/maintain-server-containers", guide)
-        for term in ("back up", "VERSION", "restart", "read-only"):
+        for term in ("back up", "version", "restart", "read-only"):
             self.assertIn(term, guide.lower())
         for name in ("README.md", "README.ru.md"):
             source = (ROOT / name).read_text(encoding="utf-8")
