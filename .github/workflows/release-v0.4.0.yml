@@ -51,13 +51,13 @@ jobs:
           import json
           from pathlib import Path
           for path in ("plugin.json", ".claude-plugin/plugin.json"):
-              assert json.loads(Path(path).read_text())["version"] == "0.4.0", path
-          assert Path("skills/maintain-server-containers/VERSION").read_text().strip() == "0.4.0"
+              assert json.loads(Path(path).read_text(encoding="utf-8"))["version"] == "0.4.0", path
+          assert Path("skills/maintain-server-containers/VERSION").read_text(encoding="utf-8").strip() == "0.4.0"
           assert Path("skills/maintain-server-containers/SKILL.md").is_file()
-          assert "## 0.4.0 - 2026-10-14" in Path("CHANGELOG.md").read_text()
+          assert "## 0.4.0 - 2026-10-14" in Path("CHANGELOG.md").read_text(encoding="utf-8")
           assert Path("docs/releases/v0.4.0.md").is_file()
-          assert "v0.4.0" in Path("README.md").read_text()
-          assert "v0.4.0" in Path("README.ru.md").read_text()
+          assert "v0.4.0" in Path("README.md").read_text(encoding="utf-8")
+          assert "v0.4.0" in Path("README.ru.md").read_text(encoding="utf-8")
           PY
           gh api "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs?head_sha=$RELEASE_SHA&branch=main&per_page=20" \
             | jq -e --arg sha "$RELEASE_SHA" '
