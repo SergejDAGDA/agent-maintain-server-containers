@@ -81,7 +81,7 @@ restore capability are blocking findings. External-admin services remain
 unilaterally.
 
 These audited preflight safeguards ship with `v0.4.0` (PR #25 and #26).
-The `v0.4.0` Release requires a separate **manual GitHub Actions dispatch** with an exact, CI-verified commit SHA. Merging a release PR does not publish the tag.
+The `v0.4.0` GitHub Release is published **manually** only after a merged commit passes both CI workflows on `main`. Merging the release PR does not publish a tag. Verify the exact tag commit and the published Release separately.
 An older installed `v0.3.0` remains unchanged until explicitly updated
 from the published `v0.4.0` tag. GitHub `main` is not an installation source.
 

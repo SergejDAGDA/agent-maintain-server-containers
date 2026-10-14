@@ -8,7 +8,7 @@ Exact release source:
 
 ## Safety-first update (recommended)
 
-The v0.4.0 tag is published only after an authorized manual GitHub Actions dispatch selecting the fully tested, merged commit SHA. Do not install from this PR or from `main` before that published Release exists.
+The v0.4.0 tag and GitHub Release are created through a separately authorized **manual GitHub publication** after both workflows pass on the exact merged `main` commit SHA. There is no custom release workflow for v0.4.0. Do not install from a PR or from `main` before that published Release exists.
 
 For an existing v0.3.0 installation, keep the current copy active until the
 v0.4.0 GitHub Release and tag are verified. This is an explicitly authorized
