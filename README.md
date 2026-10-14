@@ -55,9 +55,9 @@ check duplicate skill locations before updating.
 
 The first real read-only audit and a Codex retrospective informed the new
 fail-closed preflight, explicit runtime-to-policy coverage summary and clear
-machine-status versus agent-finding distinctions. The v0.4.0 checks were
-independently accepted with 393 offline tests on Windows and Linux, plus
-disposable Linux Compose/Restic integration. The helper still does not scan
+machine-status versus agent-finding distinctions. The PR #26 baseline was independently accepted with 393 offline tests on
+Windows and Linux, plus disposable Linux Compose/Restic integration.
+Release-specific tests add to that baseline. The helper still does not scan
 all hosts automatically or authorize changes.
 
 An initial real-world audit exposed an **interpreter dependency gap**:

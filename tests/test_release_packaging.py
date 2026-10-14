@@ -2,6 +2,11 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -43,6 +48,81 @@ class PublicReleasePackagingTests(unittest.TestCase):
             data = (ROOT / filename).read_text(encoding="utf-8")
             self.assertIn("v0.4.0", data)
             self.assertIn("CODEX-INSTALL-UPDATE.md", data)
+
+    @staticmethod
+    def _identity_script():
+        workflow = (ROOT / ".github" / "workflows" / "release-v0.4.0.yml").read_text(encoding="utf-8")
+        lines = workflow.splitlines()
+        starts = [i for i, line in enumerate(lines) if line.strip() == "python - <<'PY'"]
+        if len(starts) != 1:
+            raise AssertionError("missing or ambiguous embedded release identity check")
+        start = starts[0]
+        ends = [i for i in range(start + 1, len(lines)) if lines[i].strip() == "PY"]
+        if not ends:
+            raise AssertionError("unterminated embedded Python block")
+        return textwrap.dedent(chr(10).join(lines[start + 1:ends[0]]))
+
+    def test_release_identity_gate_runs_against_checkout(self):
+        outcome = subprocess.run(
+            [sys.executable, "-B", "-c", self._identity_script()],
+            cwd=ROOT, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+
+    def test_release_identity_gate_rejects_wrong_changelog_date(self):
+        paths = (
+            "plugin.json", ".claude-plugin/plugin.json",
+            "skills/maintain-server-containers/VERSION",
+            "skills/maintain-server-containers/SKILL.md",
+            "CHANGELOG.md", "docs/releases/v0.4.0.md",
+            "README.md", "README.ru.md",
+        )
+        with tempfile.TemporaryDirectory(prefix="msc-release-check-") as d:
+            checkout = Path(d)
+            for path in paths:
+                destination = checkout / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / path, destination)
+            changelog = checkout / "CHANGELOG.md"
+            changelog.write_text(
+                changelog.read_text(encoding="utf-8").replace(
+                    "## 0.4.0 - 2026-10-14", "## 0.4.0 - 2026-10-13", 1),
+                encoding="utf-8",
+            )
+            outcome = subprocess.run(
+                [sys.executable, "-B", "-c", self._identity_script()],
+                cwd=checkout, capture_output=True, text=True, check=False,
+            )
+        self.assertNotEqual(outcome.returncode, 0, "outdated date passed release gate")
+
+    def test_v040_publication_has_draft_and_race_guards(self):
+        wf = (ROOT / ".github" / "workflows" / "release-v0.4.0.yml").read_text(encoding="utf-8")
+        for required in (
+            "concurrency:", "cancel-in-progress: false",
+            "check_current_main()", "gh release create",
+            "if .draft == true", ".published_at == null",
+            "release_count", "release_state",
+            "git/ref/tags/$RELEASE_TAG", "published tag identity changed",
+        ):
+            self.assertIn(required, wf, required)
+        self.assertGreaterEqual(wf.count("check_current_main"), 4)
+        self.assertLess(wf.rfind("check_current_main"), wf.rfind("gh release create"))
+        self.assertNotIn("gh release edit", wf)
+        self.assertNotIn("gh release delete", wf)
+
+    def test_integration_covers_v040_release_files_for_push_and_pr(self):
+        wf = (ROOT / ".github" / "workflows" / "integration.yml").read_text(encoding="utf-8")
+        _, sep, push = wf.partition("  push:")
+        self.assertTrue(sep)
+        pr = wf.split("  push:")[0]
+        for block in (pr, push):
+            for path in (
+                ".github/workflows/release-v0.4.0.yml",
+                "docs/releases/v0.4.0.md",
+                "tests/test_release_packaging.py",
+                ".github/workflows/tests.yml",
+            ):
+                self.assertIn('      - "' + path + '"', block)
 
     def test_current_release_requires_both_ci_gates(self):
         workflow = (ROOT / ".github" / "workflows" / "release-v0.4.0.yml").read_text(encoding="utf-8")
