@@ -28,10 +28,10 @@ jobs:
       contents: write
       actions: read
     steps:
-      - name: Checkout exact human-approved SHA
+      - name: Checkout trusted main dispatch SHA, not user-provided input
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.release_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Validate both CI gates and publish once
         env:
