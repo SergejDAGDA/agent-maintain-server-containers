@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "maintain-server-containers",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Portable policy-driven Docker Compose maintenance, safe read-only audits, and targeted deployment workflows for approved project-owned releases.",
   "author": {
     "name": "Sergej DAGDA",

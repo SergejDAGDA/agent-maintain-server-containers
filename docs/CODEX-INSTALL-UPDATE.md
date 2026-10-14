@@ -1,22 +1,28 @@
-# Codex installation and update — Maintain Server Containers v0.3.0
+# Codex installation and update — Maintain Server Containers v0.4.0
 
 Canonical public repository:
 `https://github.com/SergejDAGDA/agent-maintain-server-containers`
 
 Exact release source:
-`https://github.com/SergejDAGDA/agent-maintain-server-containers/tree/v0.3.0/skills/maintain-server-containers`
+`https://github.com/SergejDAGDA/agent-maintain-server-containers/tree/v0.4.0/skills/maintain-server-containers`
 
 ## Safety-first update (recommended)
+
+The v0.4.0 tag and GitHub Release are created through a separately authorized **manual GitHub publication** after both workflows pass on the exact merged `main` commit SHA. There is no custom release workflow for v0.4.0. Do not install from a PR or from `main` before that published Release exists.
+
+For an existing v0.3.0 installation, keep the current copy active until the
+v0.4.0 GitHub Release and tag are verified. This is an explicitly authorized
+local Codex skill upgrade, not a server maintenance task.
 
 Tell Codex to perform a controlled, **local-only** installation:
 
 > Update my existing Codex skill `maintain-server-containers` to exactly
-> `v0.3.0` from the GitHub release linked above. First inspect all existing
+> `v0.4.0` from the GitHub release linked above. First inspect all existing
 > user/project skill locations and the installed skill content. Do not edit
 > the internal Codex runtime cache, unrelated skills, project-owned
 > `maintenance/services.yaml`, or any Docker services. Verify the GitHub
 > release exists and that both plugin manifests and
-> `skills/maintain-server-containers/VERSION` say `0.3.0`.
+> `skills/maintain-server-containers/VERSION` say `0.4.0`.
 > Download or clone the **tagged** repository into a temporary directory,
 > validate the canonical skill folder, then back up the currently installed
 > copy **outside all active skill discovery paths**. Replace only the
@@ -38,7 +44,7 @@ The source is **pinned to a tag**, not to `main`.
 If your Codex environment offers `$skill-installer`, you may request:
 
 ```text
-$skill-installer install https://github.com/SergejDAGDA/agent-maintain-server-containers/tree/v0.3.0/skills/maintain-server-containers
+$skill-installer install https://github.com/SergejDAGDA/agent-maintain-server-containers/tree/v0.4.0/skills/maintain-server-containers
 ```
 
 The official installer generally **refuses to overwrite** an existing
@@ -52,9 +58,9 @@ version; do not guess where the installed skill currently lives.
 ## Verification
 
 1. The public GitHub release is actually published (not merely a commit or
-   proposed tag), and the source is exactly the `v0.3.0` tag.
-2. Both repository manifests have version `0.3.0`; the installed
-   `maintain-server-containers/VERSION` contains only `0.3.0`.
+   proposed tag), and the source is exactly the `v0.4.0` tag.
+2. Both repository manifests have version `0.4.0`; the installed
+   `maintain-server-containers/VERSION` contains only `0.4.0`.
 3. `SKILL.md`, `scripts/maintenance.py`, and the `references/` documents
    are present in the **same installed skill folder**.
 4. The standalone source checkout passes:
@@ -80,6 +86,6 @@ what was verified, what remains unknown, blocked services and a suggested
 next maintenance plan. Do not infer authorization from a passing policy.
 ```
 
-**Warning:** v0.3.0 does not include a deterministic production Docker
+**Warning:** v0.4.0 does not include a deterministic production Docker
 updater or protected independent disaster-recovery service. Synthetic CI
 success is not proof that real applications are safe to upgrade.
