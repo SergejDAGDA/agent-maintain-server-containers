@@ -54,6 +54,8 @@ class PublicReleasePackagingTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertIn("3d3c42e5aac5ba805825da76410c181273ba90b1", workflow)
         self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("ref: ${{ github.sha }}", workflow)
+        self.assertNotIn("ref: ${{ inputs.release_sha }}", workflow)
         self.assertIn("tests.yml", publisher)
         self.assertIn("integration.yml", publisher)
         self.assertIn("Tag or Release already exists", publisher)
