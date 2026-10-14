@@ -2,11 +2,6 @@
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
-import sys
-import tempfile
-import textwrap
 import unittest
 from pathlib import Path
 
@@ -49,98 +44,32 @@ class PublicReleasePackagingTests(unittest.TestCase):
             self.assertIn("v0.4.0", data)
             self.assertIn("CODEX-INSTALL-UPDATE.md", data)
 
-    @staticmethod
-    def _identity_script():
+    def test_current_release_requires_manual_approved_sha_and_ci(self):
         workflow = (ROOT / ".github" / "workflows" / "release-v0.4.0.yml").read_text(encoding="utf-8")
-        lines = workflow.splitlines()
-        starts = [i for i, line in enumerate(lines) if line.strip() == "python - <<'PY'"]
-        if len(starts) != 1:
-            raise AssertionError("missing or ambiguous embedded release identity check")
-        start = starts[0]
-        ends = [i for i in range(start + 1, len(lines)) if lines[i].strip() == "PY"]
-        if not ends:
-            raise AssertionError("unterminated embedded Python block")
-        return textwrap.dedent(chr(10).join(lines[start + 1:ends[0]]))
+        publisher = (ROOT / ".github" / "scripts" / "publish_v040.py").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertNotIn("workflow_run:", workflow)
+        self.assertIn("release_sha:", workflow)
+        self.assertIn("PUBLISH-v0.4.0", workflow)
+        self.assertIn("cancel-in-progress: false", workflow)
+        self.assertIn("3d3c42e5aac5ba805825da76410c181273ba90b1", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("tests.yml", publisher)
+        self.assertIn("integration.yml", publisher)
+        self.assertIn("Tag or Release already exists", publisher)
 
-    def test_release_identity_gate_runs_against_checkout(self):
-        outcome = subprocess.run(
-            [sys.executable, "-B", "-c", self._identity_script()],
-            cwd=ROOT, capture_output=True, text=True, check=False,
-        )
-        self.assertEqual(outcome.returncode, 0, outcome.stderr)
-
-    def test_release_identity_gate_rejects_wrong_changelog_date(self):
-        paths = (
-            "plugin.json", ".claude-plugin/plugin.json",
-            "skills/maintain-server-containers/VERSION",
-            "skills/maintain-server-containers/SKILL.md",
-            "CHANGELOG.md", "docs/releases/v0.4.0.md",
-            "README.md", "README.ru.md",
-        )
-        with tempfile.TemporaryDirectory(prefix="msc-release-check-") as d:
-            checkout = Path(d)
-            for path in paths:
-                destination = checkout / path
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(ROOT / path, destination)
-            changelog = checkout / "CHANGELOG.md"
-            changelog.write_text(
-                changelog.read_text(encoding="utf-8").replace(
-                    "## 0.4.0 - 2026-10-14", "## 0.4.0 - 2026-10-13", 1),
-                encoding="utf-8",
-            )
-            outcome = subprocess.run(
-                [sys.executable, "-B", "-c", self._identity_script()],
-                cwd=checkout, capture_output=True, text=True, check=False,
-            )
-        self.assertNotEqual(outcome.returncode, 0, "outdated date passed release gate")
-
-    def test_v040_publication_has_draft_and_race_guards(self):
-        wf = (ROOT / ".github" / "workflows" / "release-v0.4.0.yml").read_text(encoding="utf-8")
-        for required in (
-            "concurrency:", "cancel-in-progress: false",
-            "check_current_main()", "gh release create",
-            "if .draft == true", ".published_at == null",
-            "release_count", "release_state",
-            "git/ref/tags/$RELEASE_TAG", "published tag identity changed",
-        ):
-            self.assertIn(required, wf, required)
-        self.assertGreaterEqual(wf.count("check_current_main"), 4)
-        self.assertLess(wf.rfind("check_current_main"), wf.rfind("gh release create"))
-        self.assertNotIn("gh release edit", wf)
-        self.assertNotIn("gh release delete", wf)
-
-    def test_integration_covers_v040_release_files_for_push_and_pr(self):
-        wf = (ROOT / ".github" / "workflows" / "integration.yml").read_text(encoding="utf-8")
-        _, sep, push = wf.partition("  push:")
+    def test_release_paths_in_both_integration_filters(self):
+        workflow = (ROOT / ".github" / "workflows" / "integration.yml").read_text(encoding="utf-8")
+        pr, sep, push = workflow.partition("  push:")
         self.assertTrue(sep)
-        pr = wf.split("  push:")[0]
-        for block in (pr, push):
-            for path in (
-                ".github/workflows/release-v0.4.0.yml",
-                "docs/releases/v0.4.0.md",
-                "tests/test_release_packaging.py",
-                ".github/workflows/tests.yml",
-            ):
-                self.assertIn('      - "' + path + '"', block)
-
-    def test_current_release_requires_both_ci_gates(self):
-        workflow = (ROOT / ".github" / "workflows" / "release-v0.4.0.yml").read_text(encoding="utf-8")
-        self.assertIn("workflow_run:", workflow)
-        self.assertIn('workflows: ["Disposable Compose recovery fixture"]', workflow)
-        self.assertIn("conclusion == 'success'", workflow)
-        self.assertIn("head_repository.full_name == github.repository", workflow)
-        self.assertIn('actions/workflows/tests.yml/runs?', workflow)
-        self.assertIn('.event == "push"', workflow)
-        self.assertIn('contents: write', workflow)
-        self.assertIn('existing tag points to a different commit', workflow)
-        self.assertIn('git/matching-refs/tags/$RELEASE_TAG', workflow)
-        self.assertIn('select(.ref == $full)', workflow)
-        self.assertIn('git/ref/tags/$RELEASE_TAG', workflow)
-        self.assertIn('gh release create', workflow)
-        self.assertIn('Published v0.4.0 is frozen', workflow)
-        self.assertIn('existing Release is not published', workflow)
-        self.assertIn('docs/releases/v0.4.0.md', workflow)
+        for part in (pr, push):
+            for path in (".github/workflows/release-v0.4.0.yml",
+                         ".github/scripts/publish_v040.py",
+                         "tests/test_release_publication.py",
+                         "README.md", "README.ru.md",
+                         "docs/CODEX-INSTALL-UPDATE.md",
+                         "skills/maintain-server-containers/SKILL.md"):
+                self.assertIn('      - "' + path + '"', part)
 
     def test_frozen_v030_publication_policy_is_preserved(self):
         workflow = (ROOT / ".github" / "workflows" / "release-v0.3.0.yml").read_text(encoding="utf-8")

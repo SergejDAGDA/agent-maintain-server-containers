@@ -8,6 +8,8 @@ Exact release source:
 
 ## Safety-first update (recommended)
 
+The v0.4.0 tag is published only after an authorized manual GitHub Actions dispatch selecting the fully tested, merged commit SHA. Do not install from this PR or from `main` before that published Release exists.
+
 For an existing v0.3.0 installation, keep the current copy active until the
 v0.4.0 GitHub Release and tag are verified. This is an explicitly authorized
 local Codex skill upgrade, not a server maintenance task.

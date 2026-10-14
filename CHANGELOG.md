@@ -2,6 +2,9 @@
 
 ## 0.4.0 - 2026-10-14
 
+- Replace automatic `workflow_run` publication with an explicitly approved one-shot `workflow_dispatch` using a fixed full commit SHA and both main-push CI gates. Any existing tag or Release blocks; incomplete publishing requires investigation, never an overwrite.
+- Pin checkout to a full verified action commit, and test the GitHub publication state machine offline.
+
 - Correct the embedded release date check and execute it in an offline regression test.
 - Serialize release jobs, recheck main at mutation boundaries, and refuse draft or unpublished releases.
 - Include v0.4.0 metadata, publishing workflow and packaging tests in integration CI triggers.
