@@ -1,6 +1,8 @@
 """Mocked GitHub release tests, offline and cross-platform."""
 from __future__ import annotations
 import importlib.util
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -100,6 +102,38 @@ class PublicationContractTests(unittest.TestCase):
         with self.assertRaises(module.ReleaseRefused):
             module.publish(api, SHA, ROOT)
         self.assertEqual(len(api.calls), 2)
+
+    def test_published_release_wrong_tag_sha_is_refused(self):
+        api = FakeAPI()
+        api.tag = "b" * 40
+        api.releases = [{"tag_name": "v0.4.0", "draft": False,
+                         "prerelease": False, "published_at": "2026-10-14"}]
+        with self.assertRaises(module.ReleaseRefused):
+            module.publish(api, SHA, ROOT)
+        self.assertFalse(api.calls)
+
+    def test_wrong_release_changelog_date_is_refused_offline(self):
+        files = ("plugin.json", ".claude-plugin/plugin.json",
+                 "skills/maintain-server-containers/VERSION",
+                 "skills/maintain-server-containers/SKILL.md",
+                 "CHANGELOG.md", "README.md", "README.ru.md",
+                 "docs/releases/v0.4.0.md")
+        with tempfile.TemporaryDirectory(prefix="msc-release-identity-") as d:
+            root = Path(d)
+            for path in files:
+                destination = root / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / path, destination)
+            change = root / "CHANGELOG.md"
+            change.write_text(
+                change.read_text(encoding="utf-8").replace(
+                    "## 0.4.0 - 2026-10-14", "## 0.4.0 - 2026-10-13", 1),
+                encoding="utf-8",
+            )
+            api = FakeAPI()
+            with self.assertRaises(module.ReleaseRefused):
+                module.publish(api, SHA, root)
+            self.assertFalse(api.calls)
 
     def test_invalid_sha_and_source_identity(self):
         for bad in ("", "x", "a" * 39):
