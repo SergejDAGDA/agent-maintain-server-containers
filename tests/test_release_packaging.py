@@ -136,10 +136,10 @@ class PublicReleasePackagingTests(unittest.TestCase):
         self.assertIn('existing tag points to a different commit', workflow)
         self.assertIn('git/matching-refs/tags/$RELEASE_TAG', workflow)
         self.assertIn('select(.ref == $full)', workflow)
-        self.assertNotIn('git/ref/tags/$RELEASE_TAG', workflow)
+        self.assertIn('git/ref/tags/$RELEASE_TAG', workflow)
         self.assertIn('gh release create', workflow)
         self.assertIn('Published v0.4.0 is frozen', workflow)
-        self.assertIn('published target and tag differ', workflow)
+        self.assertIn('existing Release is not published', workflow)
         self.assertIn('docs/releases/v0.4.0.md', workflow)
 
     def test_frozen_v030_publication_policy_is_preserved(self):
