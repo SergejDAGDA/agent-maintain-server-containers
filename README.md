@@ -10,7 +10,7 @@ Installed skill name: `maintain-server-containers`
 
 Invocation: `$maintain-server-containers`
 
-**Status: v0.3.0 (2026-10-13).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
+**Status: v0.4.0 (2026-10-14).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
 ## Architecture and security audit (13 October 2026)
 
@@ -45,13 +45,20 @@ operational safety from the experimental H31 tests.
 ## Install or update in Codex
 
 Follow the [version-pinned Codex update guide](docs/CODEX-INSTALL-UPDATE.md)
-and use the canonical skill folder from the [v0.3.0 release](https://github.com/SergejDAGDA/agent-maintain-server-containers/releases/tag/v0.3.0).
+and use the canonical skill folder from the [v0.4.0 release](https://github.com/SergejDAGDA/agent-maintain-server-containers/releases/tag/v0.4.0).
 The installable folder contains a `VERSION` marker for exact-version checks.
 Updating a repository checkout or plugin marketplace **does not automatically
 replace an older user-scope skill**. Back up an existing installation and
 check duplicate skill locations before updating.
 
-## Practical read-only acceptance (post-v0.3.0)
+## Practical read-only acceptance (included in v0.4.0)
+
+The first real read-only audit and a Codex retrospective informed the new
+fail-closed preflight, explicit runtime-to-policy coverage summary and clear
+machine-status versus agent-finding distinctions. The v0.4.0 checks were
+independently accepted with 393 offline tests on Windows and Linux, plus
+disposable Linux Compose/Restic integration. The helper still does not scan
+all hosts automatically or authorize changes.
 
 An initial real-world audit exposed an **interpreter dependency gap**:
 installing a skill does not install PyYAML into every Python interpreter.
@@ -73,8 +80,9 @@ restore capability are blocking findings. External-admin services remain
 **NO_TOUCH**; provide feedback to their administrator, never change them
 unilaterally.
 
-No version change is implied until a separate public release is created;
-the installed `v0.3.0` does **not** yet include these changes.
+These audited preflight safeguards ship with `v0.4.0` (PR #25 and #26).
+An older installed `v0.3.0` remains unchanged until explicitly updated
+from the published `v0.4.0` tag. GitHub `main` is not an installation source.
 
 ## Why
 
@@ -272,7 +280,7 @@ Do not store secrets, internal inventory, hostnames, tokens, user files or priva
 
 ## Current capability boundary
 
-| Capability | v0.3.0 |
+| Capability | v0.4.0 |
 | --- | --- |
 | Policy schema validation | Implemented |
 | Read-only Compose container identity check | Implemented |
@@ -287,7 +295,7 @@ The next version can add a tested executor with explicit adapter contracts and d
 
 ## Future lifecycle and recovery design
 
-The proposals in [the development roadmap](docs/ROADMAP.md), [lifecycle/recovery contract](docs/LIFECYCLE-RECOVERY-DESIGN.md), and [disposable test-harness specification](docs/DISPOSABLE-TEST-HARNESS.md) describe future work: typed state and evidence, event-linked backups, isolated restore tests, bounded execution and safe decommission. **These are design documents, not production capabilities added by v0.3.0.** The read-only CLI and existing safety gates remain unchanged.
+The proposals in [the development roadmap](docs/ROADMAP.md), [lifecycle/recovery contract](docs/LIFECYCLE-RECOVERY-DESIGN.md), and [disposable test-harness specification](docs/DISPOSABLE-TEST-HARNESS.md) describe future work: typed state and evidence, event-linked backups, isolated restore tests, bounded execution and safe decommission. **These are design documents, not production capabilities added by v0.4.0.** The read-only CLI and existing safety gates remain unchanged.
 
 ## Development
 

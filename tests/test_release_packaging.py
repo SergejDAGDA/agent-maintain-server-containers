@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "maintain-server-containers"
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 class PublicReleasePackagingTests(unittest.TestCase):
@@ -24,11 +24,11 @@ class PublicReleasePackagingTests(unittest.TestCase):
             self.assertTrue((SKILL / path).is_file(), path)
 
     def test_release_notes_and_changelog_cover_limitations(self):
-        notes = (ROOT / "docs" / "releases" / "v0.3.0.md").read_text(encoding="utf-8")
+        notes = (ROOT / "docs" / "releases" / "v0.4.0.md").read_text(encoding="utf-8")
         change = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        self.assertIn("## 0.3.0 - 2026-10-13", change)
-        self.assertIn("H20", notes)
-        self.assertIn("H31", notes)
+        self.assertIn("## 0.4.0 - 2026-10-14", change)
+        self.assertIn("PR #25", notes)
+        self.assertIn("PR #26", notes)
         self.assertIn("read-only", notes.lower())
         self.assertIn("off-host", notes)
         self.assertIn("no bundled deterministic production", notes.lower())
@@ -36,15 +36,33 @@ class PublicReleasePackagingTests(unittest.TestCase):
 
     def test_release_docs_explain_controlled_codex_upgrade(self):
         content = (ROOT / "docs" / "CODEX-INSTALL-UPDATE.md").read_text(encoding="utf-8")
-        for term in ("tree/v0.3.0/skills/maintain-server-containers",
+        for term in ("tree/v0.4.0/skills/maintain-server-containers",
                      "back up", "VERSION", "restart", "read-only"):
             self.assertIn(term.lower(), content.lower())
         for filename in ("README.md", "README.ru.md"):
             data = (ROOT / filename).read_text(encoding="utf-8")
-            self.assertIn("v0.3.0", data)
+            self.assertIn("v0.4.0", data)
             self.assertIn("CODEX-INSTALL-UPDATE.md", data)
 
-    def test_publication_requires_both_ci_gates(self):
+    def test_current_release_requires_both_ci_gates(self):
+        workflow = (ROOT / ".github" / "workflows" / "release-v0.4.0.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_run:", workflow)
+        self.assertIn('workflows: ["Disposable Compose recovery fixture"]', workflow)
+        self.assertIn("conclusion == 'success'", workflow)
+        self.assertIn("head_repository.full_name == github.repository", workflow)
+        self.assertIn('actions/workflows/tests.yml/runs?', workflow)
+        self.assertIn('.event == "push"', workflow)
+        self.assertIn('contents: write', workflow)
+        self.assertIn('existing tag points to a different commit', workflow)
+        self.assertIn('git/matching-refs/tags/$RELEASE_TAG', workflow)
+        self.assertIn('select(.ref == $full)', workflow)
+        self.assertNotIn('git/ref/tags/$RELEASE_TAG', workflow)
+        self.assertIn('gh release create', workflow)
+        self.assertIn('Published v0.4.0 is frozen', workflow)
+        self.assertIn('published target and tag differ', workflow)
+        self.assertIn('docs/releases/v0.4.0.md', workflow)
+
+    def test_frozen_v030_publication_policy_is_preserved(self):
         workflow = (ROOT / ".github" / "workflows" / "release-v0.3.0.yml").read_text(encoding="utf-8")
         self.assertIn("workflow_run:", workflow)
         self.assertIn('workflows: ["Disposable Compose recovery fixture"]', workflow)

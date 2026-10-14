@@ -1,6 +1,6 @@
 {
   "name": "maintain-server-containers",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Portable Compose maintenance and targeted deployment of approved local or private application project releases.",
   "author": {
     "name": "Sergej DAGDA",
