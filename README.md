@@ -198,6 +198,28 @@ for the first-install protocol. This is an **agent-operated workflow**;
 the bundled read-only CLI is not yet a production installer.
 
 
+## Deployment layout profiles
+
+The skill now defines explicit **default layouts** for new Docker Compose
+deployments: system-managed single-host Linux, remotely managed Linux over
+SSH, and a per-user/rootless Linux workstation. Existing project conventions
+**always take precedence**; do not migrate paths or data merely to match a
+template.
+
+When no standard exists, the proposed system-managed layout separates
+versioned deployment sources (`/srv/compose/<app>/`), optional host-bind
+state (`/srv/data/<app>/`), and protected runtime secrets
+(`/etc/compose-secrets/<app>/`). Named Docker volumes remain engine-managed.
+For a remote server, distinguish the management project's canonical
+non-secret sources from the actual server-side Compose/build files, verify
+their parity, and interpret bind paths on the **Docker daemon's host**.
+
+See [deployment-layouts.md](skills/maintain-server-containers/references/deployment-layouts.md)
+for environment selection, source ownership, storage boundaries, SSH,
+Compose project names, secret handling and pre-deploy/acceptance receipts.
+These paths are portable **recommendations**, not Docker/FHS requirements
+and not a reason to rewrite existing installations.
+
 ## Clean rebuild of an existing application
 
 For a broken or obsolete existing app whose models, caches or unused accounts
