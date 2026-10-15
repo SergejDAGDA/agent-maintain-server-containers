@@ -73,7 +73,11 @@ For an existing deployment or the first audit of a remote host:
    presence without invoking Docker. After reviewing the Compose sources
    and local environment, `--render` invokes only
    `docker compose [ordered -f files] config --quiet`, withholding raw error
-   output. Run it in the appropriate project directory and original
+   output. For local Dockerfile builds, `--render --check-build-sources`
+   also checks rendered local build-context and Dockerfile presence without
+   printing interpolated JSON. Remote Git, external and additional build
+   contexts still need independent review; presence is not proof of a complete
+   build. Run it in the appropriate project directory and original
    interpolation environment. A missing temporary override, required
    environment variable or source file is `SOURCE_NONREPRODUCIBLE` and
    blocks both update and rollback planning; never generate a replacement
