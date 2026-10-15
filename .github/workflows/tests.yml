@@ -34,3 +34,4 @@ jobs:
       - run: python skills/maintain-server-containers/scripts/maintenance.py --policy examples/native-policy.yaml plan
       - run: python skills/maintain-server-containers/scripts/maintenance.py --policy examples/project-managed.yaml validate
       - run: python skills/maintain-server-containers/scripts/maintenance.py --policy examples/repository-managed.yaml validate
+      - run: python skills/maintain-server-containers/scripts/compose_preflight.py --file compose.yaml --project-directory tests/fixtures/rebuild_preflight --render --check-build-sources --format json
