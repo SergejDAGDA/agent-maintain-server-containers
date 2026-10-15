@@ -6,6 +6,8 @@ Inventory the Compose project, service names, images and resolved image IDs, con
 
 ## First practical audit: source and toolchain readiness
 
+Read the deployment layout selection rules in [deployment-layouts.md](deployment-layouts.md) for new installations and source parity checks. Existing managed layout wins over illustrative defaults. A remote Docker daemon always mounts paths from its **own host**, not the client's filesystem.
+
 Run the installed `scripts/doctor.py` with the **same interpreter**
 chosen for `maintenance.py`. A successful installation of an Agent Skill
 is not evidence that PyYAML exists in each environment. A missing PyYAML
