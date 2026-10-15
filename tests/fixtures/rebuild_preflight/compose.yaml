@@ -1,0 +1,10 @@
+name: rebuild-source-rc
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local/rebuild-source-rc:fixture
+    read_only: true
+    environment:
+      SYNTHETIC: fixture
