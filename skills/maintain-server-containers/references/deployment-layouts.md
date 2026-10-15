@@ -70,6 +70,29 @@ $XDG_CONFIG_HOME/compose-secrets/<app>/  private secrets (untracked)
 
 Resolve XDG paths from the **actual deployment user's environment** (`~/.config` and `~/.local/share` defaults), and check rootless Docker socket/context, filesystem permissions and user-level service lifecycle. Do not replace an existing user's Compose identity or confuse Docker Desktop/WSL2 paths with native Linux server paths. For a workstation with a separate canonical source checkout, record the source-to-deployment relationship instead of inventing a second authority.
 
+## Upstream Git provenance and source management
+
+Every internet-sourced application needs **traceable origin and an exact installed identity**, but **not every server needs a permanent Git clone**. Pick and record one source strategy per application:
+
+| Strategy | Host Git checkout | Source of reproducibility |
+| --- | --- | --- |
+| **Published OCI image** | Not required | Official upstream/project URL, pinned release and immutable registry image digest (plus observed local image ID), canonical Compose and required config. |
+| **Remote Git build context** | Not required as a maintained server checkout | Exact repository URL, full verified commit SHA or tag + verified checksum, Dockerfile/build options, immutable resulting image identity; the builder obtains the exact source. Verify BuildKit/Compose versions and ref/checksum support before using this. |
+| **Local source build** | Required **where the build runs** only if the chosen build process needs a checked-out working tree | Managed source checkout or complete versioned source archive, remote origin URL, exact commit, submodules/dependency locks, any reviewed local patch and full Dockerfile/build context. |
+| **Project-owned edited fork** | Keep in an authoritative Git repository or equivalent versioned source store | Approved source changes/release commit, build provenance, deployment ownership and complete source-to-runtime link. Do not leave unique source edits only inside a running container. |
+
+For a build from GitHub, GitLab or another upstream repo, the agent must record at least: canonical upstream URL, resolved release/tag **and exact commit**, source acquisition/build method, required submodules or build dependencies, image ID/digest, and where the authoritative deployment/build definition resides. Distinguish an upstream commit from the installed image digest; one is not proof of the other.
+
+If an authorized build actually occurs on the Docker host and needs a checkout, use a **separate app-scoped source path under the site's existing convention** (for example `/srv/src/<app>/` for a *new* system-managed Linux host). The checked-out source is not the data volume and must not be bind-mounted read/write into a running production container by default. The server checkout is a build input or controlled source store, **not** an automatically updated live application. Keep a clean, pinned commit or an explicitly recorded reviewed patch; never silently build from a dirty working tree.
+
+If the managing machine or CI produces the verified image and the server only pulls it by digest, a persistent server-side clone is unnecessary; copying the source to the server merely for consistency adds an extra authority and additional maintenance. Remote BuildKit Git contexts may also obtain an exact Git revision without a permanent checkout; use only when the installed build toolchain supports an immutable ref/checksum and source provenance is recorded.
+
+For updates, fetch and inspect upstream release information **without changing live application source**. Select an explicit revision, prepare candidate build/image, test it, update the canonical Compose source and record the new image identity only after acceptance. **Never** run an unattended `git pull` or `git checkout` against the currently mounted/running production app as the update mechanism. Restore previous source/commit *and* image/state when a proven-safe rollback is needed.
+
+For private repositories, source credentials remain in the existing trusted credential/secret system and must not be copied into image layers, tracked Compose files or Git remotes with embedded access tokens. An upstream repository may contain unsafe build scripts; review the effective Dockerfile/build context before execution.
+
+Official upstream reference: [Docker Build Git contexts](https://docs.docker.com/build/concepts/context/) and [Compose build specification](https://docs.docker.com/reference/compose-file/build/).
+
 ## Storage, security and access invariants (all profiles)
 
 - **Release identity:** use reviewed version/immutable OCI digest or a pinned source commit with a complete Dockerfile/build context. No implicit `latest`, missing local Dockerfiles, generated ephemeral overrides or unrecorded `COMPOSE_FILE`.
