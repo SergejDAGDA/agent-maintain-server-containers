@@ -70,9 +70,13 @@ do not install packages on the inspected server merely for a read-only audit.
 
 A separate [Compose source preflight](skills/maintain-server-containers/scripts/compose_preflight.py)
 checks an explicit ordered list of Compose files **on the host where the
-files exist**. Only the optional `--render` flag invokes
-`docker compose config --quiet`, after source/environment review; raw
-interpolated output and error messages are withheld. Neither successful
+files exist**. The optional `--render` flag invokes
+`docker compose config --quiet` after source/environment review;
+`--render --check-build-sources` checks rendered **local** build context and
+Dockerfile presence via in-memory Compose JSON. Missing, remote or extra
+build contexts block the local-source assertion until independently reviewed.
+No interpolated output, source values or raw errors are emitted. Neither
+mode proves the complete build or remote runtime. Neither successful
 presence checks nor a local render validates runtime state or authorizes
 updates. Missing temporary overrides, missing required environment,
 unmanaged services, incomplete aggregate identities, and unverified
