@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0-rc.1 - release candidate (not published)
+
+- Add `rebuild <service>` agent workflow for clean replacement of existing Compose applications, with per-resource PROTECT / REPLACE / UNKNOWN state rules. Explicitly disposable models and caches do not require restoration rehearsal; protected personal files still require verification.
+- Introduce environment-aware Linux Compose layouts (single-host system service, SSH-managed remote host, user/rootless), preserving existing site conventions and distinguishing immutable OCI images from pinned Git-built source.
+- Require full canonical Compose/build source and active-server parity, genuine functional smoke, owner access, state preservation and source+runtime rollback as deployment acceptance gates. Stop incremental patches after two failed attempts.
+- Extend the existing read-only Compose source preflight with opt-in `--render --check-build-sources` to test local build context and Dockerfile presence without disclosing interpolation data. Remote/additional build contexts remain separately gated.
+- Add offline regression tests and a Docker Compose CLI fixture in CI.
+- This RC is an agent-operated workflow improvement **not** a production mutation CLI. Existing consuming-project validation or trusted-adapter blockers still fail closed. No server changes, merge, release publication or installed-skill update are implied.
+
+
 ## 0.4.0 - 2026-10-14
 
 - Ensure CI-only PostgreSQL/Restic harness closes synthetic SQLite handles before sandbox cleanup, with offline lifecycle regressions.
