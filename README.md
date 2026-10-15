@@ -100,6 +100,7 @@ The aim is to make repeatable, understandable maintenance possible with **one bo
 - Classifies update eligibility as `AUTO_SAFE`, `AUTO_GATED`, `MANUAL`, `PIN_ONLY` or `NO_TOUCH`.
 - Defines backup/recovery, smoke tests, dependency groups and rollback rules.
 - Guides authorized agents through bounded updates and accurate mutation reporting.
+- Defines a targeted `rebuild` workflow for existing applications with explicitly disposable state, without sacrificing personal files or reproducible deployment sources.
 - Keeps instance-specific hosts, accounts, paths and service profiles **out of the public skill**.
 
 The read-only helper deliberately does not pull images, change deployment files or recreate containers.
@@ -197,6 +198,37 @@ for the first-install protocol. This is an **agent-operated workflow**;
 the bundled read-only CLI is not yet a production installer.
 
 
+## Clean rebuild of an existing application
+
+For a broken or obsolete existing app whose models, caches or unused accounts
+can be discarded **with the owner's explicit approval**, use a targeted manual
+workflow rather than inventing an update or treating the service as a fresh
+`deploy-repository` installation:
+
+```text
+$maintain-server-containers rebuild doc-processor
+Replace its disposable models and job cache with a clean pinned installation.
+Preserve my personal documents and verify future update readiness.
+```
+
+A `MANUAL` class excludes broad `update-auto` runs; it does not prevent
+a separately authorized, properly gated `rebuild`. Classify each real state
+path as protected, explicitly disposable or unknown; the last category is
+never silently deleted. `NO_TOUCH`, external administration and
+project-specific safety invariants remain in effect.
+
+**Acceptance requires more than a running container:** canonical non-secret
+deployment source and effective server Compose/build inputs must match,
+application-level output must be verified, protected data must survive,
+the owner must be able to log in or have a pending setup step explicitly
+reported, and the next update must be plan-ready from reproducible files.
+On rollback, restore the *active deployment source* as well as the image.
+After two failed acceptance attempts, stop patching and reconsider the approach.
+
+Read [clean-rebuild.md](skills/maintain-server-containers/references/clean-rebuild.md).
+This is an **agent workflow**, not a new Python CLI command; it does not make
+`update-auto` available for an invalid policy.
+
 ## Deploy a project-owned application release
 
 The skill also defines a targeted agent workflow for a release built by your own
@@ -290,6 +322,7 @@ Do not store secrets, internal inventory, hostnames, tokens, user files or priva
 | Backup and restore validation | Agent/project adapter responsibility |
 | Service-specific smoke tests | Agent/project adapter responsibility |
 | Bounded update with rollback | Skill runbook, no bundled deterministic executor |
+| Targeted clean rebuild of existing apps | Agent runbook with explicit disposal and source/owner acceptance, not a deterministic installer |
 | Scheduled unattended updating | Not implemented |
 
 The next version can add a tested executor with explicit adapter contracts and disposable Docker integration tests. We intentionally do not describe that future capability as implemented today.
