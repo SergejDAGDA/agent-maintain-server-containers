@@ -33,6 +33,11 @@ For each discovered Compose project:
   optionally use `--render` to invoke only
   `docker compose -f path1 -f path2 config --quiet`.
   Never assume remote file paths exist on the Codex workstation.
+  For local-source builds, add `--render --check-build-sources` after reviewing
+  interpolation inputs; it verifies only local build-context/Dockerfile
+  presence, using Compose JSON internally without printing values. Missing,
+  non-local, or extra build contexts require separate evidence. The helper
+  does not prove a complete reproducible build or remote runtime parity.
 - Missing required interpolation variables, unreviewed includes or
   inaccessible files mean `SOURCE_NONREPRODUCIBLE`. Do not invent an
   environment variable, recreate a lost override or edit policy to
