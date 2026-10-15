@@ -24,6 +24,8 @@ Use the smallest reliable backup method for `PROTECT`. If there is no protected 
 
 ## 2. Prove deployment-source readiness before stopping anything
 
+Apply the layout selection order and host-specific deployment receipt in [deployment-layouts.md](deployment-layouts.md). For an existing installation, **retain its already authoritative paths and persistent data names**, even when they differ from the suggested profiles. A rebuild is not permission for cosmetic filesystem migration.
+
 Identify the deployment owner, established canonical non-secret Compose/build source, **complete ordered Compose/override file list**, project directory and source-to-server synchronization convention. Neither the newest chat notes nor a working live container is the authoritative deployment source.
 
 Confirm all inputs needed to **recreate the candidate later**, not just boot it once: upstream release/OCI digest or pinned source commit, Dockerfile and complete build context, required packages and build arguments, external secrets referenced but not copied, interpolation environment, architecture/runtime dependencies, fixed ports, and precise bind/named-volume identities. Avoid unnecessary custom wrappers when a supported upstream image works.
