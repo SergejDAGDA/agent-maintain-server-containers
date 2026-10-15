@@ -37,6 +37,8 @@ A memory file stating "ready" cannot replace a build/CI acceptance record. A Git
 
 ## Deployment phases
 
+Choose the established site/project layout according to [deployment-layouts.md](deployment-layouts.md) before staging release sources. Never move existing state or create a competing source of truth merely to match a default profile.
+
 **A. Discover and freeze:** Read both projects' instructions, project memory as context, actual release/build records, active Compose source stack and runtime identities. Validate installed supporting skill freshness before planning any of its writes. If a runtime-labeled Compose override is missing, do not deploy until a reproducible active source is established. Do not overwrite unrelated application code or read raw environment secrets.
 
 **B. Validate:** Confirm the targeted project has authorized deployment ownership. Keep `MANUAL` out of generic update waves; refuse `NO_TOUCH` without a separate explicitly scoped workstream. Verify complete persistent-state contract, current compatible backup, isolated restoration evidence, migration and rollback limitations, and Compose topology parity. Do not accept a restic archive integrity check as proof of a database-consistent restore.
