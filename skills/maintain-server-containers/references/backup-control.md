@@ -46,6 +46,12 @@ Exercise fail-closed negative cases in synthetic fixtures, not against real back
 
 Any backup method that would stop/restart containers (especially a global backup job impacting other services) is a **runtime mutation**. Inspect and declare its blast radius; do not run it in a read-only audit or as an unreviewed side effect of an application update.
 
+### Application-scoped checkpoints are the default for maintenance
+
+For an authorized update, rebuild or project deployment, choose an application-consistent checkpoint covering the named service and its verified, necessary dependency group only. A checkpoint may pause those named components if required for database/file consistency; it must **not** stop or restart unrelated applications merely because an existing host-wide backup script does so. Do not invoke a global stop/start backup script as an implicit fallback. Keep existing administrator-owned scheduled jobs untouched.
+
+Reuse approved native database tools, Compose and backup utilities (such as a project-owned Restic wrapper) rather than adding another backup engine. Record the precise paused services, source/image and state coverage, snapshot identity and recovery prerequisites. This rule does not permit skipping a needed database-consistent snapshot, required restore proof or encryption key. If the scoped method is missing or cannot produce a safe checkpoint, mark the target update `BLOCKED` and explain the smallest missing application-level procedure. A wider outage/backup is a **separately authorized operation** with its own explicit impact scope, never authority inferred from a request to update one application. Respect external-admin and `NO_TOUCH` ownership.
+
 ## 5. Retention, historical checkpoints and alerts
 
 - Respect project-owned retention rules. Keep protected historical/**milestone** checkpoints separate from the rolling window; the newest N backups must not silently evict the only known-good recovery point. Record actual depth, age, expected capacity, recoverability and any retention exceptions.

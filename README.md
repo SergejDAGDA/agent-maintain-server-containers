@@ -2,7 +2,7 @@
 
 [Русская версия](README.ru.md)
 
-**A reusable Agent Skill for policy-driven, state-preserving Docker Compose maintenance.**
+**A reusable Agent Skill for policy-driven Docker application lifecycle management: installation, deployment, updates, backup/recovery and controlled rebuilds across local and remote environments.**
 
 Repository: `agent-maintain-server-containers`
 
@@ -10,7 +10,7 @@ Installed skill name: `maintain-server-containers`
 
 Invocation: `$maintain-server-containers`
 
-**Latest published release: v0.4.0 (2026-10-14). v0.5.0 is prepared for a separately authorized merge, publication and local installation (NOT yet published or installed).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
+**Latest published release: v0.5.0 (2026-10-16).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
 ## Architecture and security audit (13 October 2026)
 

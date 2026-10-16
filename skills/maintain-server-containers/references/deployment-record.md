@@ -4,6 +4,8 @@ The deployment project owns the *operational* record of which release actually
 runs. The application project owns approved source/builds and product docs.
 Project memory is a secondary evidence index, never the runtime source of truth.
 
+For separately developed pet projects, their existing working deployment/status files should receive a verified projection of the actual deployed state after a successful authorized deployment, so a development chat can read current deployment facts without reconstructing the Docker host. The deployment project/runtime remains authoritative for what is actually running; the pet-project status view must include the source observation/revision and must not become a second deployment authority. The projection is required to be attempted within applicable project access/write rules, but it is **not automatic cross-chat synchronization** and never grants permission to commit/push application code. If inaccessible or disallowed, explicitly report `DEPLOYED_RECORD_SYNC_PENDING` and reconcile from fresh runtime evidence when the project can be accessed.
+
 ## Discover rather than invent
 
 Find the established project record and its owner through project instructions,
