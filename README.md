@@ -75,8 +75,11 @@ files exist**. The optional `--render` flag invokes
 `--render --check-build-sources` checks rendered **local** build context and
 Dockerfile presence via in-memory Compose JSON. Missing, remote or extra
 build contexts block the local-source assertion until independently reviewed.
-No interpolated output, source values or raw errors are emitted. Neither
-mode proves the complete build or remote runtime. Neither successful
+No interpolated output, source values or raw errors are emitted. Machine
+`compose_render_verified=true` means only a successful local Compose render;
+`source_reproducible=false` is deliberately retained even after checking
+local Dockerfile presence, because complete build provenance and runtime
+parity require independent evidence. Neither mode authorizes updates. Neither successful
 presence checks nor a local render validates runtime state or authorizes
 updates. Missing temporary overrides, missing required environment,
 unmanaged services, incomplete aggregate identities, and unverified
