@@ -101,6 +101,8 @@ Inspect both Compose render and actual Docker inspect metadata. Check that the t
 
 ## Backup / recovery gate
 
+Use [backup-control.md](backup-control.md) for the explicit read-only `backup-audit` and authorized isolated `backup-verify` workflows: per-app/group state and deployment-source coverage, event-based pre-change checkpoints, job/scheduler monitoring, historical/milestone retention, alert delivery, separate failure domains and actual restore proof. Do not create new periodic backups by default or run destructive retention from a read-only audit.
+
 A snapshot existing on disk does not imply that it is complete or restorable. Verify scope, age, protected credential availability, and evidence of a successful isolated restore. Require application-consistent backup methods for transactional databases. Generic Restic archive integrity is not the same as a valid live database restore.
 
 For a stateful app that may migrate schema, decide whether rollback requires restoring the database and files as one coherent recovery boundary. If so, arbitrary automatic image rollback is prohibited. This must become its own approved restoration plan. Do not interrupt other projects via a full-host backup without the user's maintenance authorization covering that impact.
