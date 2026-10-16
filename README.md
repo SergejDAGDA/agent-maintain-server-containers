@@ -68,6 +68,8 @@ Run it with the same interpreter planned for `maintenance.py`.
 Prefer an existing **local** Codex virtual environment with PyYAML;
 do not install packages on the inspected server merely for a read-only audit.
 
+Backup assurance is a separate agent workflow: `backup-audit [service]` checks existing jobs and event-based checkpoints, per-service data/source coverage, retention and protected historical milestones, exact snapshot evidence, off-host independence and alert delivery **read-only**; `backup-verify <service>` tests an owner-authorized isolated restore. See [backup-control.md](skills/maintain-server-containers/references/backup-control.md). The skill does not install a backup scheduler, automatically delete snapshots or claim production restore success from synthetic CI.
+
 A separate [Compose source preflight](skills/maintain-server-containers/scripts/compose_preflight.py)
 checks an explicit ordered list of Compose files **on the host where the
 files exist**. The optional `--render` flag invokes
