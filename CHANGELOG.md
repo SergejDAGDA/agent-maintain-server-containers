@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 - staged for manual publication (not yet released)
+
+- Stabilization of the reviewed v0.5.0-rc.1 capability set; no additional Docker mutation executor or host administration responsibility introduced.
+- Independent synthetic Linux Docker end-to-end exercise covered install, clean rebuild, pinned update, consistent backup/isolated restore, failure injection, source+runtime rollback and bounded cleanup on commit `4168a775b2ad0cb53d659aefb9d891a260a0dc3a` (CONDITIONAL PASS).
+- Native Codex Skill discovery/invocation remained NOT VERIFIED due to local Responses transport socket error 10013; no confirmed code blocker. Do not claim real-server recovery or production backup monitoring from synthetic evidence.
+- Server physical storage, disk/filesystem integrity and host-level backup placement or synchronization remain consuming-site administrator responsibilities, not portable Agent Skill release requirements.
+- The final `v0.5.0` package version and publication records are separately checked before release; merge, tag, Release and installed-skill upgrade remain explicit operations.
+
 ## 0.5.0-rc.1 - release candidate (not published)
 
 - Add first-class read-only `backup-audit [service]` and owner-authorized isolated `backup-verify <service>` workflows: event-based backup baselines, inventory of existing scheduled jobs, per-service data+source coverage, exact snapshot/restore proof, off-host independence, historical retention/milestone protection, job failures and alert evidence. No new scheduler, backup engine or destructive retention CLI.
