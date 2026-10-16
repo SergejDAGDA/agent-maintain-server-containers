@@ -27,7 +27,11 @@ def _decision(
         "checked_files": checked,
         "build_sources_checked": build_sources_checked,
         "build_services_checked": build_services_checked,
-        "source_reproducible": status == "SOURCE_RENDERED_LOCAL_ONLY",
+        "compose_render_verified": status == "SOURCE_RENDERED_LOCAL_ONLY",
+        # Rendering plus local build-file presence cannot establish complete
+        # source/build provenance or parity with a running deployment.
+        # These require independent agent/project evidence.
+        "source_reproducible": False,
         "runtime_state_verified": False,
         "update_authorized": False,
         "read_only": True,
