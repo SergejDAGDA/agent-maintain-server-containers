@@ -2,6 +2,7 @@
 
 ## 0.5.0-rc.1 - release candidate (not published)
 
+- Add first-class read-only `backup-audit [service]` and owner-authorized isolated `backup-verify <service>` workflows: event-based backup baselines, inventory of existing scheduled jobs, per-service data+source coverage, exact snapshot/restore proof, off-host independence, historical retention/milestone protection, job failures and alert evidence. No new scheduler, backup engine or destructive retention CLI.
 - Add `rebuild <service>` agent workflow for clean replacement of existing Compose applications, with per-resource PROTECT / REPLACE / UNKNOWN state rules. Explicitly disposable models and caches do not require restoration rehearsal; protected personal files still require verification.
 - Introduce environment-aware Linux Compose layouts (single-host system service, SSH-managed remote host, user/rootless), preserving existing site conventions and distinguishing immutable OCI images from pinned Git-built source.
 - Require full canonical Compose/build source and active-server parity, genuine functional smoke, owner access, state preservation and source+runtime rollback as deployment acceptance gates. Stop incremental patches after two failed attempts.
