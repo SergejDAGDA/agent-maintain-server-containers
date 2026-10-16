@@ -146,7 +146,12 @@ Keep these levels distinct instead of inventing equivalent CLI statuses:
   booleans. `FILES_PRESENT_NOT_RENDER_VERIFIED` returns exit 0 because
   file-presence inspection completed, but `source_reproducible=false` and
   `update_authorized=false`. `SOURCE_RENDERED_LOCAL_ONLY` proves only
-  the local quiet render. `BLOCKED` returns exit 2.
+  that Compose rendered locally, **not** source reproducibility. The separate
+  `compose_render_verified` boolean is true only after a successful render;
+  `source_reproducible` remains false even with `--check-build-sources`,
+  because presence does not prove complete build inputs or source-to-runtime
+  parity. Full reproducibility requires separate agent/project evidence.
+  `BLOCKED` returns exit 2.
 - `VALIDATOR_DEPENDENCY_MISSING`, `SOURCE_NONREPRODUCIBLE`,
   `GROUP_IDENTITY_INCOMPLETE`, and `UNMANAGED / NOT ELIGIBLE` are
   **agent-level findings**, not new machine statuses. Translate CLI
