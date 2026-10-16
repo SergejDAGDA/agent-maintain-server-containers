@@ -54,6 +54,8 @@ class LocalBuildPreflightTest(unittest.TestCase):
         self.assertEqual(result["status"], "SOURCE_RENDERED_LOCAL_ONLY")
         self.assertTrue(result["build_sources_checked"])
         self.assertEqual(result["build_services_checked"], 1)
+        self.assertTrue(result["compose_render_verified"])
+        self.assertFalse(result["source_reproducible"])  # File presence != full provenance.
         self.assertFalse(result["runtime_state_verified"])
         self.assertFalse(result["update_authorized"])
 
@@ -123,7 +125,30 @@ class LocalBuildPreflightTest(unittest.TestCase):
         self.assertEqual(result["status"], "SOURCE_RENDERED_LOCAL_ONLY")
         self.assertFalse(result["build_sources_checked"])
         self.assertIn("--quiet", call.args[0])
+        self.assertTrue(result["compose_render_verified"])
+        self.assertFalse(result["source_reproducible"])
         self.assertFalse(result["update_authorized"])
+
+    def test_plain_render_missing_dockerfile_does_not_claim_reproducibility(self):
+        # B-01: docker compose config --quiet ignores missing Dockerfiles.
+        # A successful render is independent of the build-source check.
+        self.assertFalse((self.root / "Dockerfile").exists())
+        result, _ = self.inspect(subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="", stderr="SENSITIVE_PRIVATE_ENV_VALUE"
+        ), verify=False)
+        self.assertEqual(result["status"], "SOURCE_RENDERED_LOCAL_ONLY")
+        self.assertTrue(result["compose_render_verified"])
+        self.assertFalse(result["build_sources_checked"])
+        self.assertFalse(result["source_reproducible"])
+        self.assertFalse(result["update_authorized"])
+        self.assertNotIn("SENSITIVE_PRIVATE_ENV_VALUE", str(result))
+
+    def test_missing_dockerfile_explicit_check_blocks_even_render_evidence(self):
+        result, _ = self.inspect(self.rendered())
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertFalse(result["compose_render_verified"])
+        self.assertFalse(result["source_reproducible"])
+        self.assertIn("source:dockerfile_missing_or_unreviewed", result["blockers"])
 
     def test_cli_never_prints_interpolated_secret(self):
         response = self.rendered({"context": str(self.root),
