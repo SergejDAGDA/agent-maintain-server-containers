@@ -25,6 +25,7 @@ The Python helper deliberately remains **read-only**. Docker mutation is an agen
 - [ ] Existing disposable Compose/Restic recovery CI passes on the **same SHA**.
 - [ ] Required reviewer checks that \`MANUAL\` targeted rebuild is permitted only under explicit scope; \`NO_TOUCH\` and external admin remain protected.
 - [ ] Build preflight and reports do not expose Compose interpolation, credentials or raw Docker stderr.
+- [ ] Reviewer B-01 regression: plain `--render` with missing Dockerfile must report `compose_render_verified=true`, `source_reproducible=false`, `build_sources_checked=false`; explicit `--render --check-build-sources` blocks missing Dockerfile. Neither mode claims complete source reproducibility or update authority.
 - [ ] New/modified source-file and policy contracts fail closed for missing build inputs, unknown ownership, incomplete protected data or unproven rollback.
 
 ## Required one-time disposable end-to-end acceptance
