@@ -12,6 +12,7 @@ The existing Agent Skill, run by an authorized Docker-capable agent, supports a 
 4. Bounded update (and project-approved deployment) with recorded source/image identity, compatible state, actual functional smoke and safe rollback.
 5. Repeatable site/host layout and optional Git checkout strategy; remote daemon bind paths and source/build files are checked on the server.
 6. Next maintenance can start from authoritative files and records, **not** reverse-engineer a running container.
+7. First-class agent `backup-audit` / `backup-verify` control: event-triggered change baselines, existing job monitoring, per-service/group backup coverage, historical/milestone retention, off-host evidence, alerting and authorized isolated restores, without a new scheduler or retention executor.
 
 The Python helper deliberately remains **read-only**. Docker mutation is an agent-level, permission-gated workflow using native Docker Compose and the consuming project's real deployment/source/recovery controls.
 
@@ -23,6 +24,8 @@ The Python helper deliberately remains **read-only**. Docker mutation is an agen
 - [ ] Ubuntu and Windows offline unittest suites pass on **the exact candidate SHA**.
 - [ ] Real Linux Docker Compose source-fixture check passes with \`--render --check-build-sources\`.
 - [ ] Existing disposable Compose/Restic recovery CI passes on the **same SHA**.
+- [ ] Backup control distinguishes existence, complete app+source recovery set, isolated restore, off-host independence and verified alert delivery; unknown is NOT VERIFIED, not PASS.
+- [ ] Existing schedules/event jobs and failures are observable read-only; creation is event-driven for deployments. Retention protects milestone checkpoints and suspends deletion on suspected corruption; no unattended prune or unrelated restarts.
 - [ ] Required reviewer checks that \`MANUAL\` targeted rebuild is permitted only under explicit scope; \`NO_TOUCH\` and external admin remain protected.
 - [ ] Build preflight and reports do not expose Compose interpolation, credentials or raw Docker stderr.
 - [ ] Reviewer B-01 regression: plain `--render` with missing Dockerfile must report `compose_render_verified=true`, `source_reproducible=false`, `build_sources_checked=false`; explicit `--render --check-build-sources` blocks missing Dockerfile. Neither mode claims complete source reproducibility or update authority.
@@ -38,9 +41,10 @@ Exercise these flows and record observations rather than relying on a green heal
 2. **Rebuild:** identify a protected synthetic document and an explicitly disposable cache. Replace only the cache while demonstrating protected data survival and container UID/GID writability, then run a synthetic functional smoke.
 3. **Update:** change to an approved pinned next build/revision, compare complete server Compose/build sources to canonical source and verify image, data, network, app result, records and dashboard/discovery as applicable.
 4. **Failure and rollback:** cause a bounded synthetic acceptance failure; restore/check **both** previous running image **and** active canonical/server Compose+Dockerfile or pinned source. A wrong active source is a failure.
-5. **Stop rules:** demonstrate \`MANUAL\` excluded from \`update-auto\`, but separately targetable under exact approval; \`NO_TOUCH\`, external-admin and invalid/unknown project gates are not bypassed.
-6. **Owner access:** if app onboarding needs interactive owner setup, report \`OWNER_SETUP_REQUIRED\`; do not leave a synthetic owner with a lost password and claim full acceptance.
-7. **Cleanup:** remove only exact disposable fixture resources, preserve evidence, and demonstrate no unrelated Compose resources changed.
+5. **Backup and restore control:** record synthetic app database+files+Compose recovery scope, exact snapshot/receipt, app-consistency, an isolated restore and representative functional verification. Show that lost source, unavailable repo/key or missing restore evidence blocks recovery; show milestone retention and prune refusal under suspected corruption. Production backup monitoring, real alerts and off-host disaster recovery remain NOT VERIFIED without actual site evidence.
+6. **Stop rules:** demonstrate \`MANUAL\` excluded from \`update-auto\`, but separately targetable under exact approval; \`NO_TOUCH\`, external-admin and invalid/unknown project gates are not bypassed.
+7. **Owner access:** if app onboarding needs interactive owner setup, report \`OWNER_SETUP_REQUIRED\`; do not leave a synthetic owner with a lost password and claim full acceptance.
+8. **Cleanup:** remove only exact disposable fixture resources, preserve evidence, and demonstrate no unrelated Compose resources changed.
 
 An environment where Docker is unavailable is **ENVIRONMENT** / not verified, not a passing end-to-end test. If the same acceptance goal fails twice, stop incremental patching, diagnose root cause and reconsider the custom implementation before the next attempt.
 
@@ -48,8 +52,9 @@ An environment where Docker is unavailable is **ENVIRONMENT** / not verified, no
 
 - **No standalone production mutation executor.** Do not describe \`rebuild\` or \`update-auto\` as built-in Python CLI commands.
 - **No unattended scheduled upgrades.** User authorization and site-specific adapter contracts govern actual mutations.
+- **No built-in backup scheduler, retention executor or alert transport.** `backup-audit` is read-only; `backup-verify` is an agent-operated, separately authorized isolated restore. Current project-owned schedules and alerts require independent inspection and testing.
 - **No automatic proof of disaster recovery.** Restic archive integrity, a local image and a synthetic restore are distinct from a complete off-host restore.
-- **No automatic adaptation of invalid consuming policies.** A policy with unresolved required trusted safety adapters or unknown protected state still fails closed. The SandBox-Server project-specific four known validation errors are not fixed by this portable-skill PR.
+- **No automatic adaptation of invalid consuming policies.** A policy with unresolved required trusted safety adapters or unknown protected state still fails closed. SandBox-Server's previously reported policy errors were subsequently resolved in its separate project workflow; this RC does not modify or automatically validate any consuming project's current policy.
 - **No forced filesystem migration.** Existing deployment owners and paths supersede default new-host examples.
 - **No deployment without owner authority, proven source identity and app-appropriate data boundaries.**
 
