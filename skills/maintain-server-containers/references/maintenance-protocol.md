@@ -75,7 +75,10 @@ rather than a new schema or automatic all-host scanner.
 `json_policy_ready` for JSON policies. `compose_preflight.py` exit 0
 can mean only `FILES_PRESENT_NOT_RENDER_VERIFIED`, with
 `source_reproducible=false`. Use the machine `status`, `blockers`
-and booleans together, and keep agent findings such as
+and booleans together. `compose_render_verified=true` records only a local
+Compose render. `source_reproducible` stays false even after build-source
+presence checks: complete source/build provenance and runtime parity need
+independent verification. Keep agent findings such as
 `SOURCE_NONREPRODUCIBLE` distinct. Neither program authorizes an update.
 
 ## Plan and authorization boundary
