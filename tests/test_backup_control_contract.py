@@ -25,13 +25,13 @@ class BackupControlContractTests(unittest.TestCase):
     def test_creation_event_triggered_audit_may_be_periodic(self):
         for required in ("deployment events", "before approved updates",
                          "Monitoring can be periodic without creating backups",
-                         "existing project-owned scheduled backups"):
+                         "Existing project-owned scheduled backups"):
             with self.subTest(required=required):
                 self.assertIn(required, self.control)
 
     def test_coverage_restore_offhost_have_separate_evidence(self):
         for required in ("exact immutable snapshot ID", "named volumes",
-                         "authoritative, ordered Compose", "database-and-files",
+                         "Authoritative, ordered Compose", "database-and-files",
                          "application-level", "OFF_HOST_VERIFIED",
                          "RESTORE_VERIFIED", "ALERT_DELIVERY_VERIFIED",
                          "NOT VERIFIED"):
