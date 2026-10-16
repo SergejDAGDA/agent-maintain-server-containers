@@ -6,6 +6,8 @@ Inventory the Compose project, service names, images and resolved image IDs, con
 
 ## First practical audit: source and toolchain readiness
 
+Read the deployment layout selection rules in [deployment-layouts.md](deployment-layouts.md) for new installations and source parity checks. Existing managed layout wins over illustrative defaults. A remote Docker daemon always mounts paths from its **own host**, not the client's filesystem.
+
 Run the installed `scripts/doctor.py` with the **same interpreter**
 chosen for `maintenance.py`. A successful installation of an Agent Skill
 is not evidence that PyYAML exists in each environment. A missing PyYAML
@@ -31,11 +33,20 @@ For each discovered Compose project:
   optionally use `--render` to invoke only
   `docker compose -f path1 -f path2 config --quiet`.
   Never assume remote file paths exist on the Codex workstation.
+  For local-source builds, add `--render --check-build-sources` after reviewing
+  interpolation inputs; it verifies only local build-context/Dockerfile
+  presence, using Compose JSON internally without printing values. Missing,
+  non-local, or extra build contexts require separate evidence. The helper
+  does not prove a complete reproducible build or remote runtime parity.
 - Missing required interpolation variables, unreviewed includes or
   inaccessible files mean `SOURCE_NONREPRODUCIBLE`. Do not invent an
   environment variable, recreate a lost override or edit policy to
   silence errors. Quiet render success is *not* proof of running state,
-  application readiness or restore capability.
+  application readiness or restore capability. The **deployment owner** must
+  identify one canonical non-secret source and the server's effective sources;
+  if they diverge, do not accept an update, deployment or rollback as ready.
+  Local source files with missing build contexts, Dockerfiles or pinned
+  upstream revisions are not reproducible.
 - Enumerate all runtime Compose services and unlabelled containers, and
   mark any missing from maintenance policy `UNMANAGED` / not eligible
   rather than silently dropping them from the inventory.
@@ -64,7 +75,10 @@ rather than a new schema or automatic all-host scanner.
 `json_policy_ready` for JSON policies. `compose_preflight.py` exit 0
 can mean only `FILES_PRESENT_NOT_RENDER_VERIFIED`, with
 `source_reproducible=false`. Use the machine `status`, `blockers`
-and booleans together, and keep agent findings such as
+and booleans together. `compose_render_verified=true` records only a local
+Compose render. `source_reproducible` stays false even after build-source
+presence checks: complete source/build provenance and runtime parity need
+independent verification. Keep agent findings such as
 `SOURCE_NONREPRODUCIBLE` distinct. Neither program authorizes an update.
 
 ## Plan and authorization boundary
@@ -87,14 +101,22 @@ Inspect both Compose render and actual Docker inspect metadata. Check that the t
 
 ## Backup / recovery gate
 
+Use [backup-control.md](backup-control.md) for the explicit read-only `backup-audit` and authorized isolated `backup-verify` workflows: per-app/group state and deployment-source coverage, event-based pre-change checkpoints, job/scheduler monitoring, historical/milestone retention, alert delivery, separate failure domains and actual restore proof. Do not create new periodic backups by default or run destructive retention from a read-only audit.
+
 A snapshot existing on disk does not imply that it is complete or restorable. Verify scope, age, protected credential availability, and evidence of a successful isolated restore. Require application-consistent backup methods for transactional databases. Generic Restic archive integrity is not the same as a valid live database restore.
 
 For a stateful app that may migrate schema, decide whether rollback requires restoring the database and files as one coherent recovery boundary. If so, arbitrary automatic image rollback is prohibited. This must become its own approved restoration plan. Do not interrupt other projects via a full-host backup without the user's maintenance authorization covering that impact.
 
+## Source and rebuild boundaries
+
+A clean replacement of an existing, owner-authorized application is **not** a first install or a policy `update-auto` operation. Follow [clean-rebuild.md](clean-rebuild.md), including per-path `PROTECT` / `REPLACE` / `UNKNOWN` classification before deletion. `MANUAL` means excluded from broad automation, not an unconditional veto on a separate targeted manual workstream. An invalid policy, an unverified required safety adapter, `NO_TOUCH`, unknown ownership or external administration cannot be sidestepped by relabelling an operation `rebuild`.
+
+For both normal updates and clean rebuilds, **freeze the complete authoritative deployment source before mutation**: ordered Compose files and project directory, upstream image/commit identity, non-secret build inputs, secret references and state locations. A candidate must not replace the last-known-good source until accepted. A successful image rollback with the wrong active Compose/Dockerfile is still a failed rollback.
+
 ## Bounded execution checklist
 
 Before:
-- Capture immutable current image ID and existing source/render.
+- Capture immutable current image ID, canonical non-secret deployment source and effective server source/render. Verify they match or stop.
 - Confirm correct Compose project and exactly one intended service or scoped dependency group.
 - Verify no concurrent maintenance deployment.
 - Prepare a rollback source that cannot be silently changed by floating image tags.
@@ -112,15 +134,19 @@ Verify:
 - Service-specific output, data access and user-account probes with non-sensitive credentials/fixtures.
 - Persistent volume and bind identity parity, no unexpected initialization or schema changes.
 - Nearby ingress/discovery/dependencies still work.
+- The **installed** ordered Compose and build inputs match the canonical reproducible deployment definition and recorded image/source identity.
+- A real owner login/setup path is available; when owner interaction is required, report `OWNER_SETUP_REQUIRED` rather than unconditional success.
+- A future bounded update can use the recorded source without reconstructing configuration from a running container.
 
 Failure:
-- If and only if rollback was classified image-only safe, reapply the previous immutable image/deployment and revalidate.
+- If and only if rollback was classified image-only safe, reapply the previous immutable image/**canonical and server deployment source** and revalidate. Check active policy/record points to that proven old release, not the failed candidate.
 - When state migration may already have occurred, stop instead of forcing older binaries against newer schema.
-- Failed rollback or unverified state integrity stops the whole wave. Preserve evidence without leaking secrets.
+- Failed rollback, remaining source drift or unverified protected state integrity stops the affected dependency workstream. Preserve evidence without leaking secrets.
+- One focused correction for a demonstrated defect is permitted. After two failed acceptance attempts for the same component, stop incremental retries and reconsider whether the custom implementation is needed; do not keep editing and redeploying.
 
 ## Avoid approval fatigue
 
-Do not ask for permission for every pull, up, healthcheck, and safe rollback inside a specifically authorized update run. Do ask when the discovered action would change network exposure, access rights, move or reset user data, expand to a MANUAL/NO_TOUCH service, or require destructive state restoration. External platform approval controls remain in force.
+Do not ask for permission for every pull, up, healthcheck, and safe rollback inside a specifically authorized update or targeted manual rebuild. A separately authorized `rebuild <service>` covers only the named target and explicitly owner-approved disposable state. Do ask when a discovered action expands the scope, changes network exposure or access rights, touches unapproved/unknown personal data, adds an unapproved MANUAL target, crosses a NO_TOUCH/ownership boundary, or requires destructive protected-state restoration. External platform approval controls remain in force.
 
 ## Evidence and reporting
 

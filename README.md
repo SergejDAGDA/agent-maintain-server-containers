@@ -10,7 +10,7 @@ Installed skill name: `maintain-server-containers`
 
 Invocation: `$maintain-server-containers`
 
-**Status: v0.4.0 (2026-10-14).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
+**Latest published release: v0.4.0 (2026-10-14). v0.5.0 is prepared for a separately authorized merge, publication and local installation (NOT yet published or installed).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
 ## Architecture and security audit (13 October 2026)
 
@@ -68,11 +68,20 @@ Run it with the same interpreter planned for `maintenance.py`.
 Prefer an existing **local** Codex virtual environment with PyYAML;
 do not install packages on the inspected server merely for a read-only audit.
 
+Backup assurance is a separate agent workflow: `backup-audit [service]` checks existing jobs and event-based checkpoints, per-service data/source coverage, retention and protected historical milestones, exact snapshot evidence, off-host independence and alert delivery **read-only**; `backup-verify <service>` tests an owner-authorized isolated restore. See [backup-control.md](skills/maintain-server-containers/references/backup-control.md). The skill does not install a backup scheduler, automatically delete snapshots or claim production restore success from synthetic CI.
+
 A separate [Compose source preflight](skills/maintain-server-containers/scripts/compose_preflight.py)
 checks an explicit ordered list of Compose files **on the host where the
-files exist**. Only the optional `--render` flag invokes
-`docker compose config --quiet`, after source/environment review; raw
-interpolated output and error messages are withheld. Neither successful
+files exist**. The optional `--render` flag invokes
+`docker compose config --quiet` after source/environment review;
+`--render --check-build-sources` checks rendered **local** build context and
+Dockerfile presence via in-memory Compose JSON. Missing, remote or extra
+build contexts block the local-source assertion until independently reviewed.
+No interpolated output, source values or raw errors are emitted. Machine
+`compose_render_verified=true` means only a successful local Compose render;
+`source_reproducible=false` is deliberately retained even after checking
+local Dockerfile presence, because complete build provenance and runtime
+parity require independent evidence. Neither mode authorizes updates. Neither successful
 presence checks nor a local render validates runtime state or authorizes
 updates. Missing temporary overrides, missing required environment,
 unmanaged services, incomplete aggregate identities, and unverified
@@ -100,6 +109,7 @@ The aim is to make repeatable, understandable maintenance possible with **one bo
 - Classifies update eligibility as `AUTO_SAFE`, `AUTO_GATED`, `MANUAL`, `PIN_ONLY` or `NO_TOUCH`.
 - Defines backup/recovery, smoke tests, dependency groups and rollback rules.
 - Guides authorized agents through bounded updates and accurate mutation reporting.
+- Defines a targeted `rebuild` workflow for existing applications with explicitly disposable state, without sacrificing personal files or reproducible deployment sources.
 - Keeps instance-specific hosts, accounts, paths and service profiles **out of the public skill**.
 
 The read-only helper deliberately does not pull images, change deployment files or recreate containers.
@@ -197,6 +207,59 @@ for the first-install protocol. This is an **agent-operated workflow**;
 the bundled read-only CLI is not yet a production installer.
 
 
+## Deployment layout profiles
+
+The skill now defines explicit **default layouts** for new Docker Compose
+deployments: system-managed single-host Linux, remotely managed Linux over
+SSH, and a per-user/rootless Linux workstation. Existing project conventions
+**always take precedence**; do not migrate paths or data merely to match a
+template.
+
+When no standard exists, the proposed system-managed layout separates
+versioned deployment sources (`/srv/compose/<app>/`), optional host-bind
+state (`/srv/data/<app>/`), and protected runtime secrets
+(`/etc/compose-secrets/<app>/`). Named Docker volumes remain engine-managed.
+For a remote server, distinguish the management project's canonical
+non-secret sources from the actual server-side Compose/build files, verify
+their parity, and interpret bind paths on the **Docker daemon's host**.
+
+See [deployment-layouts.md](skills/maintain-server-containers/references/deployment-layouts.md)
+for environment selection, source ownership, storage boundaries, SSH,
+Compose project names, secret handling and pre-deploy/acceptance receipts.
+These paths are portable **recommendations**, not Docker/FHS requirements
+and not a reason to rewrite existing installations.
+
+## Clean rebuild of an existing application
+
+For a broken or obsolete existing app whose models, caches or unused accounts
+can be discarded **with the owner's explicit approval**, use a targeted manual
+workflow rather than inventing an update or treating the service as a fresh
+`deploy-repository` installation:
+
+```text
+$maintain-server-containers rebuild doc-processor
+Replace its disposable models and job cache with a clean pinned installation.
+Preserve my personal documents and verify future update readiness.
+```
+
+A `MANUAL` class excludes broad `update-auto` runs; it does not prevent
+a separately authorized, properly gated `rebuild`. Classify each real state
+path as protected, explicitly disposable or unknown; the last category is
+never silently deleted. `NO_TOUCH`, external administration and
+project-specific safety invariants remain in effect.
+
+**Acceptance requires more than a running container:** canonical non-secret
+deployment source and effective server Compose/build inputs must match,
+application-level output must be verified, protected data must survive,
+the owner must be able to log in or have a pending setup step explicitly
+reported, and the next update must be plan-ready from reproducible files.
+On rollback, restore the *active deployment source* as well as the image.
+After two failed acceptance attempts, stop patching and reconsider the approach.
+
+Read [clean-rebuild.md](skills/maintain-server-containers/references/clean-rebuild.md).
+This is an **agent workflow**, not a new Python CLI command; it does not make
+`update-auto` available for an invalid policy.
+
 ## Deploy a project-owned application release
 
 The skill also defines a targeted agent workflow for a release built by your own
@@ -290,6 +353,7 @@ Do not store secrets, internal inventory, hostnames, tokens, user files or priva
 | Backup and restore validation | Agent/project adapter responsibility |
 | Service-specific smoke tests | Agent/project adapter responsibility |
 | Bounded update with rollback | Skill runbook, no bundled deterministic executor |
+| Targeted clean rebuild of existing apps | Agent runbook with explicit disposal and source/owner acceptance, not a deterministic installer |
 | Scheduled unattended updating | Not implemented |
 
 The next version can add a tested executor with explicit adapter contracts and disposable Docker integration tests. We intentionally do not describe that future capability as implemented today.

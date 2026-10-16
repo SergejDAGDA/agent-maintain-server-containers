@@ -1,6 +1,6 @@
 # Deploy a third-party repository
 
-Agent workflow: `deploy-repository <repository-url> [ref]`. This is the **first installation** of a separately developed application into a managed Docker Compose environment, not a request to upgrade an existing image. The bundled Python CLI remains read-only and does **not** execute installation or deployment.
+Agent workflow: `deploy-repository <repository-url> [ref]`. This is the **first installation** of a separately developed application into a managed Docker Compose environment, not a request to upgrade or reinstall an existing image. For a deliberately fresh replacement of an existing service, use [clean-rebuild.md](clean-rebuild.md) and its data-disposal rules. The bundled Python CLI remains read-only and does **not** execute installation or deployment.
 
 ## Intention and authority
 
@@ -31,7 +31,9 @@ Default to private/LAN-only or loopback exposure when location-specific rules al
 
 ### 3. Create reproducible source and configuration
 
-- Choose the host's existing deployment-management convention. Commit project-owned, non-secret Compose files and lockable references to its deployment source; do not improvise a second source of truth. A container `docker run` copy alone is not an acceptable reproducible release.
+Choose the site-specific or default profile in [deployment-layouts.md](deployment-layouts.md) **before** creating source, storage or secret directories. This includes determining whether Docker runs on the agent's host or a remote Linux server; all bind paths belong to the daemon host. The default example layout is not mandatory when a consuming project already has an adopted convention.
+
+- Choose the host's existing deployment-management convention. Preserve all required, project-owned **non-secret** ordered Compose files, build context, Dockerfile and immutable upstream artifact/source references in **one authoritative deployment source**. If the project requires a local management copy and a server copy, use its defined synchronization/verification rule; do not improvise a second source of truth. A container `docker run` copy or Compose that omits a local build context is not an acceptable reproducible release.
 - Create data directories and named volumes scoped to the new application; **never reuse or replace an existing state source by guesswork**.
 - Supply ordinary non-sensitive defaults automatically. Where credentials are required, use the host's existing secret store or a protected external configuration file with restrictive access. For POSIX files, require owner-only read/write permissions (0600) and a validated owner; for other platforms, verify the equivalent ACL. Check effective ownership and access after creation without printing the contents. Generate new secrets using cryptographically secure facilities when the install contract calls for initial new credentials; do not log, commit or emit the secret value. Ask for a missing third-party credential if no safe supplied source exists.
 - Check all required environment keys, images, startup ordering, health and smoke probes, resource quotas, and architecture compatibility.
@@ -45,7 +47,7 @@ For genuinely new isolated state, there is no pre-existing application user data
 
 Create and start only the new bounded Compose project. Never run `docker compose down -v`, global prunes, broad resource cleanup, unmanaged scripts, or recreation of unrelated services.
 
-Verify final effective Compose, image IDs/digests, stable container health, any required application-level smoke, port and network isolation, persistent mount identities, and the absence of unintended host exposures. If initial installation fails, remove only provably new disposable runtime resources within scope; do not destroy created user data or non-empty state. Record partial state and manual recovery needs.
+Verify final effective **server** Compose and required build inputs against the authoritative source, image IDs/digests, stable container health, a **real application-level synthetic smoke** with expected outputs, port and network isolation, persistent mount identities, and the absence of unintended host exposures. Verify required project-owned dashboard/service-discovery integration without duplicating entries or altering another owner's resources. Verify initial owner login/setup can be completed securely; if an interactive owner step remains, report `OWNER_SETUP_REQUIRED` rather than installation fully accepted. A green container healthcheck alone is not sufficient. If initial installation fails, remove only provably new disposable runtime resources within scope; do not destroy created user data or non-empty state. Record partial state and manual recovery needs.
 
 Read [deployment-record.md](deployment-record.md) to discover the correct operational record owner and existing schema, and to check project-local integration requirements (such as dashboard labels, network exposure and directory conventions). Never hardcode one host's service inventory or naming.
 
@@ -59,7 +61,7 @@ After a successful verified installation, add the application to the **existing 
 
 Update the deployment owner's existing operational record, and optionally invoke installed project-memory or documentation skills through their actual scope and approval contracts. These integrations are never prerequisites to deploying the application. Do not overwrite canonical project memory or generate a handoff file merely because an optional skill is missing.
 
-Return the exact installed application reference, version/build digest, URLs/bindings, Compose source, state/backup responsibility, tests performed, what is still unverified, and all six mutation dimensions. When deployment succeeded but a non-essential memory sync did not, use `DEPLOYED_RECORD_SYNC_PENDING`; when installation failed, report a precise partial state without presenting it as complete.
+Return the exact installed application reference, version/build digest, URLs/bindings, **authoritative complete deployment/build sources and server parity**, state/backup responsibility, real functional smoke, owner access/setup status, integration checks, whether a next bounded update is plan-ready, what is still unverified, and all six mutation dimensions. When deployment succeeded but a non-essential memory sync did not, use `DEPLOYED_RECORD_SYNC_PENDING`; when installation failed, report a precise partial state without presenting it as complete.
 
 ## Important boundary
 

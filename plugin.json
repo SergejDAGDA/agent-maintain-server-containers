@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "maintain-server-containers",
-  "version": "0.4.0",
-  "description": "Portable policy-driven Docker Compose maintenance, safe read-only audits, and targeted deployment workflows for approved project-owned releases.",
+  "version": "0.5.0",
+  "description": "Portable Docker Compose maintenance, repeatable installation and bounded clean rebuild workflows with explicit state and source gates.",
   "author": {
     "name": "Sergej DAGDA",
     "url": "https://github.com/SergejDAGDA"
@@ -22,7 +22,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Maintain Server Containers",
-    "shortDescription": "Audit Docker and guide safe project/repository deployments",
+    "shortDescription": "Audit, install, rebuild and update Docker Compose services",
     "developerName": "Sergej DAGDA",
     "category": "Developer Tools",
     "capabilities": [
@@ -33,9 +33,10 @@
     "defaultPrompt": [
       "Audit my Compose server without changing its state.",
       "Plan available container updates and tell me which are safe.",
+      "Rebuild my named Docker application cleanly, discard only approved caches/models, preserve personal data, and verify reproducible sources and future update readiness.",
       "Update eligible AUTO_SAFE services under the current project's maintenance policy while preserving data.",
       "Deploy the latest approved release of my project-managed application, verify persistent state and, if optional project-memory tooling is available and authorized, checkpoint confirmed deployment facts; otherwise report pending sync."
     ],
-    "longDescription": "Audit and plan container maintenance; guide bounded agent-run deployment of approved project builds or external repositories. Core operations do not require other Agent Skills; optional memory/documentation synchronization may remain pending."
+    "longDescription": "Audit and plan Docker maintenance; guide first installs, controlled clean rebuilds of existing apps and bounded project/repository deployments. Protect user state, preserve canonical Compose/build sources, and gate owner access and functional acceptance. Production mutations remain agent-operated, not a bundled CLI executor."
   }
 }

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0 - staged for manual publication (not yet released)
+
+- Stabilization of the reviewed v0.5.0-rc.1 capability set; no additional Docker mutation executor or host administration responsibility introduced.
+- Independent synthetic Linux Docker end-to-end exercise covered install, clean rebuild, pinned update, consistent backup/isolated restore, failure injection, source+runtime rollback and bounded cleanup on commit `4168a775b2ad0cb53d659aefb9d891a260a0dc3a` (CONDITIONAL PASS).
+- Native Codex Skill discovery/invocation remained NOT VERIFIED due to local Responses transport socket error 10013; no confirmed code blocker. Do not claim real-server recovery or production backup monitoring from synthetic evidence.
+- Server physical storage, disk/filesystem integrity and host-level backup placement or synchronization remain consuming-site administrator responsibilities, not portable Agent Skill release requirements.
+- The final `v0.5.0` package version and publication records are separately checked before release; merge, tag, Release and installed-skill upgrade remain explicit operations.
+
+## 0.5.0-rc.1 - release candidate (not published)
+
+- Add first-class read-only `backup-audit [service]` and owner-authorized isolated `backup-verify <service>` workflows: event-based backup baselines, inventory of existing scheduled jobs, per-service data+source coverage, exact snapshot/restore proof, off-host independence, historical retention/milestone protection, job failures and alert evidence. No new scheduler, backup engine or destructive retention CLI.
+- Add `rebuild <service>` agent workflow for clean replacement of existing Compose applications, with per-resource PROTECT / REPLACE / UNKNOWN state rules. Explicitly disposable models and caches do not require restoration rehearsal; protected personal files still require verification.
+- Introduce environment-aware Linux Compose layouts (single-host system service, SSH-managed remote host, user/rootless), preserving existing site conventions and distinguishing immutable OCI images from pinned Git-built source.
+- Require full canonical Compose/build source and active-server parity, genuine functional smoke, owner access, state preservation and source+runtime rollback as deployment acceptance gates. Stop incremental patches after two failed attempts.
+- Extend the existing read-only Compose source preflight with opt-in `--render --check-build-sources` to test local build context and Dockerfile presence without disclosing interpolation data. Remote/additional build contexts remain separately gated.
+- Add offline regression tests and a Docker Compose CLI fixture in CI.
+- Fix B-01 from independent RC review: quiet Compose render and local build-file presence no longer set `source_reproducible=true`; expose separate `compose_render_verified` evidence and cover missing Dockerfile under plain render.
+- This RC is an agent-operated workflow improvement **not** a production mutation CLI. Existing consuming-project validation or trusted-adapter blockers still fail closed. No server changes, merge, release publication or installed-skill update are implied.
+
+
 ## 0.4.0 - 2026-10-14
 
 - Ensure CI-only PostgreSQL/Restic harness closes synthetic SQLite handles before sandbox cleanup, with offline lifecycle regressions.

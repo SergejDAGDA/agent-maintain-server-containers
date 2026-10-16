@@ -120,7 +120,9 @@ class AcceptancePreflightTests(unittest.TestCase):
                                 str(root), "-f", str(first), "-f", str(second),
                                 "config", "--quiet"])
         self.assertEqual(result["status"], "SOURCE_RENDERED_LOCAL_ONLY")
-        self.assertTrue(result["source_reproducible"])
+        self.assertTrue(result["compose_render_verified"])
+        self.assertFalse(result["source_reproducible"])
+        self.assertFalse(result["build_sources_checked"])
         self.assertFalse(result["runtime_state_verified"])
         self.assertFalse(result["update_authorized"])
         self.assertNotIn("NOT_USED_SECRET", repr(result))

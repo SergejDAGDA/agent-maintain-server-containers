@@ -1,7 +1,7 @@
 {
   "name": "maintain-server-containers",
-  "version": "0.4.0",
-  "description": "Portable Compose maintenance and targeted deployment of approved local or private application project releases.",
+  "version": "0.5.0",
+  "description": "Portable Docker Compose maintenance, reproducible first installs, targeted clean rebuilds and approved project release deployments.",
   "author": {
     "name": "Sergej DAGDA",
     "url": "https://github.com/SergejDAGDA"

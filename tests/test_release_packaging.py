@@ -1,4 +1,4 @@
-"""v0.4.0 release package checks. No GitHub requests or publication."""
+"""Staged v0.5.0 package and historical published release checks."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "maintain-server-containers"
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 
 class PublicReleasePackagingTests(unittest.TestCase):

@@ -25,7 +25,7 @@ Discover existing authoritative records before creating anything:
 
 1. Application root and deployment root, established from project instructions, not guessed from container names.
 2. Approved release identity, source revision and immutable artifact digest or reproducible build provenance.
-3. Validated deployment source and any applicable persistent Compose override (including its durable location).
+3. Validated **authoritative non-secret deployment source** including the complete ordered Compose/override stack, project directory, every required Dockerfile/build-context input and pinned upstream source; verify effective server-side source parity, not just existence of a local Compose example.
 4. Exact service/group scope, dependency compatibility, topology contract and environment secret **references** (never values).
 5. Data/schema migration plan, backup freshness and **restoration evidence** appropriate to the persistent state.
 6. Application-specific read-only smoke and state-identity tests.
@@ -37,13 +37,15 @@ A memory file stating "ready" cannot replace a build/CI acceptance record. A Git
 
 ## Deployment phases
 
+Choose the established site/project layout according to [deployment-layouts.md](deployment-layouts.md) before staging release sources. Never move existing state or create a competing source of truth merely to match a default profile.
+
 **A. Discover and freeze:** Read both projects' instructions, project memory as context, actual release/build records, active Compose source stack and runtime identities. Validate installed supporting skill freshness before planning any of its writes. If a runtime-labeled Compose override is missing, do not deploy until a reproducible active source is established. Do not overwrite unrelated application code or read raw environment secrets.
 
 **B. Validate:** Confirm the targeted project has authorized deployment ownership. Keep `MANUAL` out of generic update waves; refuse `NO_TOUCH` without a separate explicitly scoped workstream. Verify complete persistent-state contract, current compatible backup, isolated restoration evidence, migration and rollback limitations, and Compose topology parity. Do not accept a restic archive integrity check as proof of a database-consistent restore.
 
 **C. Apply:** Stage the exact approved release, preserve the previous immutable runtime/source and a durable copy of the effective deployment inputs, then apply only the approved Compose group. Any generated release override must be durable and reproducible, not an ephemeral temporary file. Treat each stop/start/recreate/restart as a runtime mutation.
 
-**D. Verify:** Observe health/stability; run application-owned smoke and state checks; compare mounted volumes, account state, uploads, configuration/instance identity and runtime IDs. Only perform automatic rollback when image/source rollback is proven safe for the actual migrated state. If state-aware restoration would be required, stop with `RECOVERY_REQUIRED` instead of forcing old code onto new data.
+**D. Verify:** Observe health/stability; run application-owned **functional** smoke and state checks; compare mounted volumes, account state, uploads, configuration/instance identity and runtime IDs. Verify the final approved canonical source/complete build inputs reproduce the active server deployment; unresolved source drift blocks full release acceptance. Verify owner access/onboarding if the project requires it; when secure interactive setup is outstanding report `OWNER_SETUP_REQUIRED`, not full acceptance. Only perform automatic rollback when image/source rollback is proven safe for the actual migrated state. If state-aware restoration would be required, stop with `RECOVERY_REQUIRED` instead of forcing old code onto new data.
 
 **E. Record only what happened:** Once runtime verification passes, write or update the deployment owner's existing authoritative deployment record with approved release identity, source revision, artifact/image digest, Compose source identity, actual runtime identities, timestamp, smoke checks and recovery references. Do not create a competing ledger when the project already has one.
 
@@ -61,7 +63,7 @@ Successful deployment is a meaningful **Checkpoint**, not a new active Handoff:
 
 ## Partial failures
 
-Deployment and cross-project documentation are **not atomic**. If runtime is verified healthy but record synchronization fails, report `DEPLOYED_RECORD_SYNC_PENDING` and the exact pending updates. Do not roll back a good runtime solely because a documentation or project-memory write failed. If deployment fails, distinguish `BLOCKED_BEFORE_MUTATION`, `FAILED_SAFE_ROLLBACK` and `RECOVERY_REQUIRED` and do not report success.
+Deployment and cross-project documentation are **not atomic**. If runtime is verified healthy but record synchronization fails, report `DEPLOYED_RECORD_SYNC_PENDING` and the exact pending updates. Do not roll back a good runtime solely because a documentation or project-memory write failed. If deployment fails, distinguish `BLOCKED_BEFORE_MUTATION`, `FAILED_SAFE_ROLLBACK` and `RECOVERY_REQUIRED` and do not report success. A safe rollback must restore/check the **active authoritative and server deployment sources** as well as the previous runtime identity; do not leave candidate build files as the active release. After two failed acceptance attempts for the same goal, stop incremental patching and reassess the custom build/upstream alternative before another mutation.
 
 Report six operational mutation dimensions independently: application version, runtime/container, persistent user state, deployment source, network/access and database schema. Separately report application documentation, application memory and server memory as `UPDATED`, `UNCHANGED`, `PENDING` or `BLOCKED`. Label all evidence as independently verified, declared or not verified; never conflate historical receipts with current observation.
 
