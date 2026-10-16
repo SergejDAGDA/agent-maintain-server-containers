@@ -7,6 +7,7 @@
 - Require full canonical Compose/build source and active-server parity, genuine functional smoke, owner access, state preservation and source+runtime rollback as deployment acceptance gates. Stop incremental patches after two failed attempts.
 - Extend the existing read-only Compose source preflight with opt-in `--render --check-build-sources` to test local build context and Dockerfile presence without disclosing interpolation data. Remote/additional build contexts remain separately gated.
 - Add offline regression tests and a Docker Compose CLI fixture in CI.
+- Fix B-01 from independent RC review: quiet Compose render and local build-file presence no longer set `source_reproducible=true`; expose separate `compose_render_verified` evidence and cover missing Dockerfile under plain render.
 - This RC is an agent-operated workflow improvement **not** a production mutation CLI. Existing consuming-project validation or trusted-adapter blockers still fail closed. No server changes, merge, release publication or installed-skill update are implied.
 
 
