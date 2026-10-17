@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.5.0 - staged for manual publication (not yet released)
+## 0.5.1
+
+- Require application-scoped consistent checkpoints for targeted updates and deployments; do not invoke host-wide stop-all backup scripts without separate explicit authorization.
+- Route verified pet-project deployment receipts to project-memory and impacted-documentation owners, preserving their independent write policies and pending-sync status.
+- Clarify portable Docker application lifecycle scope, optional companion-skill dependencies and read-only inspection of local pet-project revisions.
+
+## 0.5.0 - 2026-10-16
 
 - Stabilization of the reviewed v0.5.0-rc.1 capability set; no additional Docker mutation executor or host administration responsibility introduced.
 - Independent synthetic Linux Docker end-to-end exercise covered install, clean rebuild, pinned update, consistent backup/isolated restore, failure injection, source+runtime rollback and bounded cleanup on commit `4168a775b2ad0cb53d659aefb9d891a260a0dc3a` (CONDITIONAL PASS).

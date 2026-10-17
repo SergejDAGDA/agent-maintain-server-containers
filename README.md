@@ -10,7 +10,7 @@ Installed skill name: `maintain-server-containers`
 
 Invocation: `$maintain-server-containers`
 
-**Latest published release: v0.5.0 (2026-10-16).** Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
+**Published releases:** check the [GitHub Releases page](https://github.com/SergejDAGDA/agent-maintain-server-containers/releases); the installable package version is declared in `skills/maintain-server-containers/VERSION` and both plugin manifests. Updating a separately installed Agent Skill is an explicit action; publishing repository files does not automatically replace an existing installation. The bundled CLI can validate a portable project policy and run read-only policy/runtime audits, status and planning. The skill also defines the complete agent-operated upgrade workflow, but it does **not** ship a production mutation executor. Do not confuse a passing schema check with a verified safe deployment.
 
 ## Architecture and security audit (13 October 2026)
 
@@ -45,7 +45,7 @@ operational safety from the experimental H31 tests.
 ## Install or update in Codex
 
 Follow the [version-pinned Codex update guide](docs/CODEX-INSTALL-UPDATE.md)
-and use the canonical skill folder from the [v0.4.0 release](https://github.com/SergejDAGDA/agent-maintain-server-containers/releases/tag/v0.4.0).
+and use the canonical skill folder from the [latest published release](https://github.com/SergejDAGDA/agent-maintain-server-containers/releases/latest).
 The installable folder contains a `VERSION` marker for exact-version checks.
 Updating a repository checkout or plugin marketplace **does not automatically
 replace an older user-scope skill**. Back up an existing installation and

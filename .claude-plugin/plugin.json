@@ -1,6 +1,6 @@
 {
   "name": "maintain-server-containers",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Portable Docker Compose maintenance, reproducible first installs, targeted clean rebuilds and approved project release deployments.",
   "author": {
     "name": "Sergej DAGDA",
