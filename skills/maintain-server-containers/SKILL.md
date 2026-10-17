@@ -1,11 +1,11 @@
 ---
 name: maintain-server-containers
-description: Audit, plan, and carry out bounded, state-preserving maintenance of Docker Compose services using a project-owned policy and evidence-based gates. Use for container version reviews, upgrade preparation, immutable image pinning, safe patch waves, rollback planning, controlled semi-automatic updates, explicitly authorized clean rebuilds of existing applications, explicit deployment of approved project-managed releases, and bounded first-time installation of third-party Git repositories with persistent-state safeguards. Never change unknown, externally managed, or migration-sensitive state merely because a newer image exists.
+description: Manage the Docker Compose application lifecycle across local, remote and server environments: audit, plan, install, deploy, update and recover services with project-owned policy and evidence-based state-preserving gates. Use for container version reviews, upgrade preparation, immutable image pinning, safe patch waves, rollback planning, controlled semi-automatic updates, explicitly authorized clean rebuilds of existing applications, explicit deployment of approved project-managed releases, and bounded first-time installation of third-party Git repositories with persistent-state safeguards. Never change unknown, externally managed, or migration-sensitive state merely because a newer image exists.
 ---
 
 # Maintain Server Containers
 
-A portable Agent Skill for Docker Compose maintenance. The project owns its deployment files, service policy and runtime state. The skill owns the reusable procedure. Do not embed instance-specific addresses, service names, passwords or paths in the skill.
+A portable Agent Skill for Docker Compose application lifecycle management, including installation, release deployment, updates, rebuilds, backups, recovery and state reconciliation. Its historical invocation `$maintain-server-containers` remains unchanged for compatibility; the workflow applies to local and remote Docker environments, not only dedicated servers. The project owns its deployment files, service policy and runtime state. The skill owns the reusable procedure. Do not embed instance-specific addresses, service names, passwords or paths in the skill.
 
 ## Select an operation
 
@@ -179,6 +179,7 @@ A `project_managed` release strategy is independent of these policy classes. It 
 ## Non-negotiable safety rules
 
 - **No proven state contract, no update.** Identify persistent bind paths, named volumes, database, accounts, user files, keys, configuration and container identity. Empty lists must be explicit, not assumed.
+- **Target-only backup by default.** An authorized operation on one application must not stop or restart unrelated Compose projects through its pre-change backup. Use an application-consistent, scoped checkpoint for the named service or explicit dependency group. If the only available backup path has a wider interruption scope, block the update and request a separate, explicit authorization for that wider operation; do not invoke a global backup as an implicit fallback. See [backup-control.md](references/backup-control.md).
 - **Backup existence is not recovery assurance.** Check the event-triggered baseline, protected state and deployment-source coverage, exact snapshot ID, independent restore evidence, repository/key availability, retention of historical milestones, monitoring and off-host failure domain separately using [backup-control.md](references/backup-control.md). Scheduled checks do not authorize scheduled backup creation or destructive retention.
 - **Image rollback is not state rollback.** A database or filesystem migration may make downgrading the image unsafe. Preserve a tested restoration path and do not automatically restore production data unless that separately approved runbook proves it safe.
 - Never use `docker compose down -v`, global `docker system prune`, anonymous-volume replacement, tag-only rollback, implicit `latest` pull, or recreate unrelated services.

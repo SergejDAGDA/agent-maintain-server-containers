@@ -4,6 +4,8 @@ The deployment project owns the *operational* record of which release actually
 runs. The application project owns approved source/builds and product docs.
 Project memory is a secondary evidence index, never the runtime source of truth.
 
+For separately developed pet projects, the deployment workflow must produce a verified runtime receipt and **orchestrate** feedback into the application's existing project files through their respective owners: `$project-documentation update` for maintained technical/deployment documentation and `$maintain-project-memory Checkpoint` for current status and coordination artifacts. The deployment skill itself owns only its operational record and evidence receipt; it does not directly author app-project documentation or project memory. This handoff requires actual access and project-policy authorization. The pet-project files are a time-stamped projection of observed deployment facts, not a second source of runtime authority; the development chat must reread them when work resumes. If tools, access or permission are missing, report `DEPLOYED_RECORD_SYNC_PENDING` with the exact evidence/destination rather than falsely claiming cross-chat synchronization. No implicit commit/push of application code or documents is authorized.
+
 ## Discover rather than invent
 
 Find the established project record and its owner through project instructions,
